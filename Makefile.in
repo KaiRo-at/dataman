@@ -60,6 +60,8 @@ EXTRA_COMPONENTS = aboutData.js
 # include config.mk before using the AB_CD var
 include $(topsrcdir)/config/config.mk
 
-DEFINES += -DAB_CD=en-US
+DEFINES += -DAB_CD=en-US \
+           -DINSTALL_EXTENSION_ID=$(INSTALL_EXTENSION_ID) \
+           -DEXTENSION_VERSION=$(EXTENSION_VERSION)
 
 include $(topsrcdir)/config/rules.mk
