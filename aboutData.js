@@ -38,7 +38,7 @@
 Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 function AboutData() { }
-About.prototype = {
+AboutData.prototype = {
   classDescription: "about:data",
   contractID: "@mozilla.org/network/protocol/about;1?what=data",
   classID: Components.ID("{7a02e7fe-b32c-40ea-a790-246ca49b6061}"),

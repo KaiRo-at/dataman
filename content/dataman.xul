@@ -50,25 +50,25 @@
   <script type="application/javascript"
           src="chrome://dataman/content/dataman.js"/>
 
-  <hbox>
-    <vbox>
+  <hbox flex="1">
+    <vbox flex="1">
       <textbox id="search-box"
                clickSelectsAll="true"
                type="search"
                class="compact"
                placeholder="&search.placeholder;"
                oncommand="searchDomains(this.value);"/>
-      <tree id="domainTree" onselect="domainSelected();">
+      <tree id="domainTree" onselect="domainSelected();" flex="1">
         <treecols>
-          <treecol id="domainCol" label="&domaintree.domain.label;"/>
+          <treecol id="domainCol" label="&domaintree.domain.label;" flex="1"/>
         </treecols>
         <treechildren/>
       </tree>
     </vbox>
 
-    <splitter>
+    <splitter/>
 
-    <tabbox id="tabbox" flex="1">
+    <tabbox id="tabbox" flex="6">
       <tabs>
         <tab id="cookiesTab" label="&tab.cookies.label;"/>
         <tab id="permissionsTab" label="&tab.permissions.label;"/>

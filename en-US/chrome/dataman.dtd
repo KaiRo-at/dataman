@@ -46,3 +46,7 @@
 <!ENTITY tab.preferences.label "Preferences">
 <!ENTITY tab.passwords.label "Passwords">
 <!ENTITY tab.formdata.label "Form Data">
+
+<!-- overlay -->
+<!ENTITY datamanCmd.label "Data Manager">
+<!ENTITY datamanCmd.accesskey "M">
