@@ -70,11 +70,11 @@
 
     <tabbox id="tabbox" flex="6">
       <tabs>
-        <tab id="cookiesTab" label="&tab.cookies.label;"/>
-        <tab id="permissionsTab" label="&tab.permissions.label;"/>
-        <tab id="preferencesTab" label="&tab.preferences.label;"/>
-        <tab id="passwordsTab" label="&tab.passwords.label;"/>
-        <tab id="formdataTab" label="&tab.formdata.label;"/>
+        <tab id="cookiesTab" label="&tab.cookies.label;" disabled="true"/>
+        <tab id="permissionsTab" label="&tab.permissions.label;" disabled="true"/>
+        <tab id="preferencesTab" label="&tab.preferences.label;" disabled="true"/>
+        <tab id="passwordsTab" label="&tab.passwords.label;" disabled="true"/>
+        <tab id="formdataTab" label="&tab.formdata.label;" disabled="true"/>
       </tabs>
 
       <tabpanels id="tabpanels" flex="1">

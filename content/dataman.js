@@ -40,7 +40,13 @@ Components.utils.import("resource://gre/modules/Services.jsm");
 window.addEventListener("load",  initialize, false);
 
 var gCookieService = Components.classes["@mozilla.org/cookiemanager;1"]
-                               .getService(Components.interfaces.nsICookieManager);
+                               .getService(Components.interfaces.nsICookieManager2);
+
+var gContentPrefService = Components.classes["@mozilla.org/content-pref/service;1"]
+                                    .getService(Components.interfaces.nsIContentPrefService);
+
+var gPasswordManager = Components.classes["@mozilla.org/login-manager;1"]
+                                 .getService(Components.interfaces.nsILoginManager);
 
 function initialize() {
   gDomains.initialize();
@@ -59,19 +65,70 @@ var gDomains = {
     this.tree.treeBoxObject.view = domainTreeView;
 
     // global "domain"
-    this.domainObjects.push({title: "*", hasCookies: false, hasFormData: true});
+    this.domainObjects.push({title: "*", hasFormData: true});
 
     // add domains for all cookies we find
-    var enumerator = gCookieService.enumerator;
+    let enumerator = gCookieService.enumerator;
     while (enumerator.hasMoreElements()) {
       let nextCookie = enumerator.getNext();
       if (!nextCookie) break;
       nextCookie = nextCookie.QueryInterface(Components.interfaces.nsICookie);
-      let host = nextCookie.host;
-      if (host.charAt(0) == ".") { host = host.substring(1, host.length); }
+      let host = nextCookie.host.replace(/^\./, "");
       // add only new domains to the array
-      if (!this.domainObjects.some(function(element, index, array) { return element.title == host; })) {
-        this.domainObjects.push({title: host, hasCookies: true, hasFormData: false});
+      if (!this.domainObjects.some(function(aElement, aIndex, aArray) { return aElement.title == host; })) {
+        this.domainObjects.push({title: host, hasCookies: true});
+      }
+    }
+
+    // add domains for permissions
+    let enumerator = Services.perms.enumerator;
+    while (enumerator.hasMoreElements()) {
+      let nextPermission = enumerator.getNext();
+      nextPermission = nextPermission.QueryInterface(Components.interfaces.nsIPermission);
+      let host = nextPermission.host.replace(/^\./, "");
+      // for existing domains, add flags, for others, add to the array
+      if (!this.domainObjects.some(
+            function(aElement, aIndex, aArray) {
+              if (aElement.title == host)
+                aArray[aIndex].hasPermissions = true;
+              return aElement.title == host;
+            })) {
+        this.domainObjects.push({title: host, hasPermissions: true});
+      }
+    }
+
+    // add domains for content prefs
+    try {
+      var statement = gContentPrefService.DBConnection.createStatement("SELECT groups.name AS host FROM groups");
+      while (statement.executeStep()) {
+        let host = statement.row["host"];
+        // for existing domains, add flags, for others, add to the array
+        if (!this.domainObjects.some(
+              function(aElement, aIndex, aArray) {
+                if (aElement.title == host)
+                  aArray[aIndex].hasPreferences = true;
+                return aElement.title == host;
+              })) {
+          this.domainObjects.push({title: host, hasPreferences: true});
+        }
+      }
+    }
+    finally {
+      statement.reset();
+    }
+
+    // add domains for passwords
+    let signons = gPasswordManager.getAllLogins();
+    for (let i = 0; i < signons.length; i++) {
+      let host = signons[i].hostname.replace(/^\w+:\/\//, "");
+      // for existing domains, add flags, for others, add to the array
+      if (!this.domainObjects.some(
+            function(aElement, aIndex, aArray) {
+              if (aElement.title == host)
+                aArray[aIndex].hasPasswords = true;
+              return aElement.title == host;
+            })) {
+        this.domainObjects.push({title: host, hasPasswords: true});
       }
     }
 
@@ -85,20 +142,19 @@ var gDomains = {
       return;
     }
     let selectedDomain = this.domainObjects[this.tree.currentIndex];
-    Services.console.logStringMessage("Selected: " + selectedDomain.title);
     // disable/enable and hide/show the tabs as needed
     gTabs.cookiesTab.disabled = !selectedDomain.hasCookies;
     gTabs.permissionsTab.disabled = !selectedDomain.hasPermissions;
     gTabs.preferencesTab.disabled = !selectedDomain.hasPreferences;
     gTabs.passwordsTab.disabled = !selectedDomain.hasPasswords;
     gTabs.formdataTab.hidden = !selectedDomain.hasFormData;
+    gTabs.formdataTab.disabled = !selectedDomain.hasFormData;
     while (gTabs.tabbox.selectedTab.disabled || gTabs.tabbox.selectedTab.hidden) {
       gTabs.tabbox.tabs.advanceSelectedTab(1, true);
     }
   },
 
   search: function(aSearchString) {
-    Services.console.logStringMessage("Search for: " + aSearchString);
     this.tree.treeBoxObject.beginUpdateBatch();
     this.displayedDomains = [];
     for (let i = 0; i < this.domainObjects.length; i++) {
