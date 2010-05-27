@@ -6,9 +6,10 @@ dataman.jar:
 % locale  dataman  @AB_CD@ %locale/@AB_CD@/dataman/
 % overlay chrome://browser/content/browser.xul chrome://dataman/content/fxOverlay.xul application={ec8030f7-c20a-464f-9b0e-13a3a9e97384}
 % overlay chrome://communicator/content/tasksOverlay.xul chrome://dataman/content/smOverlay.xul application={92650c4d-4b8e-4d2a-b7eb-24ecf4f6b63a}
-  content/dataman/dataman.js               (content/dataman.js)
-  content/dataman/dataman.xul              (content/dataman.xul)
-  content/dataman/fxOverlay.xul            (content/fxOverlay.xul)
-  content/dataman/smOverlay.xul            (content/smOverlay.xul)
-  skin/classic/dataman/dataman.css         (skin/classic/dataman.css)
-  locale/@AB_CD@/dataman/dataman.dtd       (%chrome/dataman.dtd)
+  content/dataman/dataman.js                (content/dataman.js)
+  content/dataman/dataman.xul               (content/dataman.xul)
+  content/dataman/fxOverlay.xul             (content/fxOverlay.xul)
+  content/dataman/smOverlay.xul             (content/smOverlay.xul)
+  skin/classic/dataman/dataman.css          (skin/classic/dataman.css)
+  locale/@AB_CD@/dataman/dataman.dtd        (%chrome/dataman.dtd)
+  locale/@AB_CD@/dataman/dataman.properties (%chrome/dataman.properties)

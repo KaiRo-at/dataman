@@ -69,34 +69,55 @@
     <splitter/>
 
     <tabbox id="tabbox" flex="6">
-      <tabs>
+      <tabs onselect="gTabs.select();">
         <tab id="cookiesTab" label="&tab.cookies.label;" disabled="true"/>
         <tab id="permissionsTab" label="&tab.permissions.label;" disabled="true"/>
         <tab id="preferencesTab" label="&tab.preferences.label;" disabled="true"/>
         <tab id="passwordsTab" label="&tab.passwords.label;" disabled="true"/>
         <tab id="formdataTab" label="&tab.formdata.label;" disabled="true"/>
+        <tab id="forgetTab" label="&tab.forget.label;" hidden="true"/>
       </tabs>
 
       <tabpanels id="tabpanels" flex="1">
-        <tabpanel id="cookiesPanel" flex="1">
-          <description value="dataman: cookies panel"/>
-        </tabpanel>
+        <vbox id="cookiesPanel" flex="1">
+          <description value="&cookies.description;"/>
+          <tree id="cookiesTree" flex="1"
+                    onkeypress="gCookies.handleKeyPress(event)"
+                    onselect="gCookies.select();">
+            <treecols>
+              <treecol id="cookieHostCol" label="&cookietree.host.label;" flex="5"
+                       onclick="gCookies.sort('rawHost', true);" persist="width hidden"
+                       sortDirection="ascending"/>
+              <splitter class="tree-splitter"/>
+              <treecol id="cookieNameCol" label="&cookietree.name.label;" flex="5"
+                       onclick="gCookies.sort('name', true);" persist="width hidden"/>
+              <splitter class="tree-splitter"/>
+              <treecol id="CookieExpiresCol" label="&cookietree.expires.label;" flex="10"
+                       hidden="true" onclick="gCookies.sort('expires', true);" persist="width hidden"/>
+            </treecols>
+            <treechildren/>
+          </tree>
+        </vbox>
 
-        <tabpanel id="permissionsPanel" flex="1">
+        <vbox id="permissionsPanel" flex="1">
           <description value="dataman: permissions panel"/>
-        </tabpanel>
+        </vbox>
 
-        <tabpanel id="preferencesPanel" flex="1">
+        <vbox id="preferencesPanel" flex="1">
           <description value="dataman: preferences panel"/>
-        </tabpanel>
+        </vbox>
 
-        <tabpanel id="passwordsPanel" flex="1">
+        <vbox id="passwordsPanel" flex="1">
           <description value="dataman: passwords panel"/>
-        </tabpanel>
+        </vbox>
 
-        <tabpanel id="formdataPanel" flex="1">
+        <vbox id="formdataPanel" flex="1">
           <description value="dataman: form data panel"/>
-        </tabpanel>
+        </vbox>
+
+        <vbox id="forgetPanel" flex="1">
+          <description value="dataman: forget panel"/>
+        </vbox>
       </tabpanels>
     </tabbox>
   </hbox>

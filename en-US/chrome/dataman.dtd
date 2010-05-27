@@ -46,6 +46,14 @@
 <!ENTITY tab.preferences.label "Preferences">
 <!ENTITY tab.passwords.label "Passwords">
 <!ENTITY tab.formdata.label "Form Data">
+<!ENTITY tab.forget.label "Forget">
+
+<!-- cookies -->
+<!ENTITY cookies.description "This domain has stored the following cookies on your computer:">
+
+<!ENTITY cookietree.host.label "Website">
+<!ENTITY cookietree.name.label "Cookie Name">
+<!ENTITY cookietree.expires.label "Expires">
 
 <!-- overlay -->
 <!ENTITY datamanCmd.label "Data Manager">
