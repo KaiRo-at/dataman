@@ -275,6 +275,7 @@ var gTabs = {
           gPerms.shutdown();
           break;
         case "preferencesPanel":
+          gPrefs.shutdown();
           break;
         case "passwordsPanel":
           gPasswords.shutdown();
@@ -299,6 +300,7 @@ var gTabs = {
         gPerms.initialize();
         break;
       case "preferencesPanel":
+        gPrefs.initialize();
         break;
       case "passwordsPanel":
         gPasswords.initialize();
@@ -600,6 +602,90 @@ var passwordTreeView = {
 };
 
 
+var gPrefs = {
+  tree: null,
+
+  prefs: [],
+
+  initialize: function() {
+    this.tree = document.getElementById("prefsTree");
+    this.tree.treeBoxObject.view = prefsTreeView;
+
+    this.tree.treeBoxObject.beginUpdateBatch();
+    try {
+      // get all groups (hosts) that match the domain
+      let sql = "SELECT groups.name AS host FROM groups WHERE host=:hostName OR host LIKE :hostMatch ESCAPE '/'";
+      var statement = gLocSvc.cpref.DBConnection.createStatement(sql);
+      statement.params.hostName = gDomains.selectedDomainName;
+      statement.params.hostMatch = "%." + statement.escapeStringForLIKE(gDomains.selectedDomainName, "/");
+      while (statement.executeStep()) {
+        // now, get all prefs for that host
+        let enumerator =  gLocSvc.cpref.getPrefs(statement.row["host"]).enumerator;
+        while (enumerator.hasMoreElements()) {
+          let pref = enumerator.getNext().QueryInterface(Components.interfaces.nsIProperty);
+          this.prefs.push({host: statement.row["host"], name: pref.name, value: pref.value});
+        }
+      }
+    }
+    finally {
+      statement.reset();
+    }
+    this.tree.treeBoxObject.endUpdateBatch();
+    this.tree.treeBoxObject.invalidate();
+  },
+
+  shutdown: function() {
+    this.tree.treeBoxObject.view = null;
+    this.prefs = [];
+  },
+
+  select: function() {
+    Services.console.logStringMessage("Selected: " + this.tree.currentIndex);
+  },
+
+  handleKeyPress: function(aEvent) {
+    if (aEvent.keyCode == KeyEvent.DOM_VK_DELETE) {
+      this.delete();
+    }
+  },
+
+  sort: function(aColumn, aUpdateSelection) {
+    Services.console.logStringMessage("Sort: " + aColumn);
+  },
+
+  delete: function() {
+    Services.console.logStringMessage("Pref delete requested");
+  },
+};
+
+var prefsTreeView = {
+  get rowCount() {
+    return gPrefs.prefs.length;
+  },
+  setTree: function(aTree) {},
+  getImageSrc: function(aRow, aColumn) {},
+  getProgressMode: function(aRow, aColumn) {},
+  getCellValue: function(aRow, aColumn) {},
+  getCellText: function(aRow, aColumn) {
+    switch (aColumn.id) {
+      case "prefsHostCol":
+        return gPrefs.prefs[aRow].host;
+      case "prefsNameCol":
+        return gPrefs.prefs[aRow].name;
+      case "prefsValueCol":
+        return gPrefs.prefs[aRow].value;
+    }
+  },
+  isSeparator: function(aIndex) { return false; },
+  isSorted: function() { return false; },
+  isContainer: function(aIndex) { return false; },
+  cycleHeader: function(aCol) {},
+  getRowProperties: function(aRow, aProp) {},
+  getColumnProperties: function(aColumn, aProp) {},
+  getCellProperties: function(aRow, aColumn, aProp) {}
+};
+
+
 var gFormdata = {
   tree: null,
 
@@ -611,7 +697,8 @@ var gFormdata = {
 
     this.tree.treeBoxObject.beginUpdateBatch();
     try {
-      var statement = gLocSvc.fhist.DBConnection.createStatement("SELECT fieldname, value, timesUsed, firstUsed, lastUsed, guid FROM moz_formhistory");
+      let sql = "SELECT fieldname, value, timesUsed, firstUsed, lastUsed, guid FROM moz_formhistory";
+      var statement = gLocSvc.fhist.DBConnection.createStatement(sql);
       while (statement.executeStep()) {
         this.formdata.push({fieldname: statement.row["fieldname"],
                             value: statement.row["value"],

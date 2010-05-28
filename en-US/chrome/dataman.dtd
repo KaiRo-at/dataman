@@ -63,6 +63,13 @@
 <!ENTITY perm.AllowSession "Allow for Session">
 <!ENTITY perm.Block "Block">
 
+<!-- preferences -->
+<!ENTITY prefs.description "Content preferences are a way for &brandShortName; to make save of its settings, like zoom levels, specifically for a website.">
+
+<!ENTITY preftree.host.label "Website">
+<!ENTITY preftree.name.label "Preference Name">
+<!ENTITY preftree.value.label "Value">
+
 <!-- passwords -->
 <!ENTITY passwords.description "You have the following passwords stored for this domain:">
 

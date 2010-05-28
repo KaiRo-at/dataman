@@ -41,6 +41,8 @@
 <?xml-stylesheet href="chrome://dataman/skin/dataman.css" type="text/css"?>
 
 <!DOCTYPE page [
+<!ENTITY % brandDTD SYSTEM "chrome://branding/locale/brand.dtd">
+%brandDTD;
 <!ENTITY % datamanDTD SYSTEM "chrome://dataman/locale/dataman.dtd">
 %datamanDTD;
 ]>
@@ -124,7 +126,24 @@
         </vbox>
 
         <vbox id="preferencesPanel" flex="1">
-          <description value="dataman: preferences panel"/>
+          <description value="&prefs.description;"/>
+          <tree id="prefsTree" flex="1"
+                    onkeypress="gPrefs.handleKeyPress(event)"
+                    onselect="gPrefs.select();">
+            <treecols>
+              <treecol id="prefsHostCol" label="&preftree.host.label;" flex="5"
+                       onclick="gPrefs.sort('host', true);" persist="width hidden"
+                       sortDirection="ascending"/>
+              <splitter class="tree-splitter"/>
+              <treecol id="prefsNameCol" label="&preftree.name.label;" flex="5"
+                       onclick="gPrefs.sort('name', true);" persist="width hidden"
+                       sortDirection="ascending"/>
+              <splitter class="tree-splitter"/>
+              <treecol id="prefsValueCol" label="&preftree.value.label;" flex="10"
+                       onclick="gPrefs.sort('value', true);" persist="width hidden"/>
+            </treecols>
+            <treechildren/>
+          </tree>
         </vbox>
 
         <vbox id="passwordsPanel" flex="1">
