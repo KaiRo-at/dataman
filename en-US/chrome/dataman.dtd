@@ -63,6 +63,18 @@
 <!ENTITY perm.AllowSession "Allow for Session">
 <!ENTITY perm.Block "Block">
 
+<!-- passwords -->
+<!ENTITY passwords.description "You have the following passwords stored for this domain:">
+
+<!ENTITY pwdtree.host.label "Website">
+<!ENTITY pwdtree.username.label "Username">
+<!ENTITY pwdtree.password.label "Password">
+
+<!ENTITY pwd.remove.label "Remove">
+<!ENTITY pwd.remove.accesskey "R">
+<!ENTITY pwd.copyPasswordCmd.label "Copy Password">
+<!ENTITY pwd.copyPasswordCmd.accesskey "C">
+
 <!-- overlay -->
 <!ENTITY datamanCmd.label "Data Manager">
 <!ENTITY datamanCmd.accesskey "M">

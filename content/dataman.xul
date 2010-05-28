@@ -55,6 +55,20 @@
   <script type="application/javascript"
           src="chrome://dataman/content/dataman.js"/>
 
+  <popupset id="datamanContextSet">
+    <popup id="passwordsTreeContextMenu"
+           onpopupshowing="gPasswords.updateContext()">
+      <menuitem id="pwd-context-remove"
+                label="&pwd.remove.label;"
+                accesskey="&pwd.remove.accesskey;"
+                oncommand="gPasswords.delete();"/>
+      <menuitem id="pwd-context-copypassword"
+                label="&pwd.copyPasswordCmd.label;"
+                accesskey="&pwd.copyPasswordCmd.accesskey;"
+                oncommand="gPasswords.copyPassword()"/>
+    </popup>
+  </popupset>
+
   <hbox flex="1">
     <vbox flex="1">
       <textbox id="search-box"
@@ -114,7 +128,30 @@
         </vbox>
 
         <vbox id="passwordsPanel" flex="1">
-          <description value="dataman: passwords panel"/>
+          <description value="&passwords.description;"/>
+          <tree id="passwordsTree" flex="1" hidecolumnpicker="true"
+                onkeypress="gPasswords.handleKeyPress(event)"
+                onselect="gPasswords.select();"
+                context="passwordsTreeContextMenu">
+            <treecols>
+              <treecol id="pwdHostCol" label="&pwdtree.host.label;" flex="5"
+                      onclick="gPasswords.sort('hostname');" persist="width"
+                      sortDirection="ascending"/>
+              <splitter class="tree-splitter"/>
+              <treecol id="pwdUserCol" label="&pwdtree.username.label;" flex="2"
+                       onclick="gPasswords.sort('username');" persist="width"/>
+              <splitter class="tree-splitter"/>
+              <treecol id="pwdPasswordCol" label="&pwdtree.password.label;" flex="2"
+                       onclick="gPasswords.sort('password');" persist="width"
+                       hidden="true"/>
+            </treecols>
+            <treechildren/>
+          </tree>
+          <hbox id="passwordButtons">
+            <spacer flex="1"/>
+            <button id="pwdToggle"
+                    oncommand="gPasswords.togglePasswordVisible();"/>
+          </hbox>
         </vbox>
 
         <vbox id="formdataPanel" flex="1">

@@ -274,6 +274,7 @@ var gTabs = {
         case "preferencesPanel":
           break;
         case "passwordsPanel":
+          gPasswords.shutdown();
           break;
         case "formdataPanel":
           break;
@@ -296,6 +297,7 @@ var gTabs = {
       case "preferencesPanel":
         break;
       case "passwordsPanel":
+        gPasswords.initialize();
         break;
       case "formdataPanel":
         break;
@@ -417,8 +419,6 @@ var cookieTreeView = {
 var gPerms = {
   list: null,
 
-  perms: [],
-
   initialize: function() {
     this.list = document.getElementById("permList");
 
@@ -457,6 +457,139 @@ var gPerms = {
   shutdown: function() {
     while (this.list.hasChildNodes())
       this.list.removeChild(this.list.firstChild);
-    this.perms = [];
   },
+};
+
+
+var gPasswords = {
+  tree: null,
+  toggleButton: null,
+  pwdCol: null,
+
+  showPasswords: false,
+  signons: [],
+
+  initialize: function() {
+    this.tree = document.getElementById("passwordsTree");
+    this.tree.treeBoxObject.view = passwordTreeView;
+
+    this.toggleButton = document.getElementById("pwdToggle");
+    this.toggleButton.label = gDatamanBundle.getString("pwd.showPasswords");
+    this.toggleButton.accessKey = gDatamanBundle.getString("pwd.showPasswords.accesskey");
+
+    this.pwdCol = document.getElementById("pwdPasswordCol");
+
+    this.tree.treeBoxObject.beginUpdateBatch();
+    let allSignons = gLocSvc.pwd.getAllLogins();
+    for (let i = 0; i < allSignons.length; i++) {
+      if (gDomains.hostMatchesSelected(allSignons[i].hostname, true))
+      this.signons.push(allSignons[i]);
+    }
+    this.tree.treeBoxObject.endUpdateBatch();
+    this.tree.treeBoxObject.invalidate();
+  },
+
+  shutdown: function() {
+    this.tree.treeBoxObject.view = null;
+    this.signons = [];
+  },
+
+  select: function() {
+    Services.console.logStringMessage("Selected: " + this.tree.currentIndex);
+  },
+
+  handleKeyPress: function(aEvent) {
+    if (aEvent.keyCode == KeyEvent.DOM_VK_DELETE) {
+      this.delete();
+    }
+  },
+
+  sort: function(aColumn, aUpdateSelection) {
+    Services.console.logStringMessage("Sort: " + aColumn);
+  },
+
+  delete: function() {
+    Services.console.logStringMessage("Password delete requested");
+  },
+
+  togglePasswordVisible: function() {
+    if (this.showPasswords || this._confirmShowPasswords()) {
+      this.showPasswords = !this.showPasswords;
+      this.toggleButton.label = gDatamanBundle.getString(this.showPasswords ? "pwd.hidePasswords" : "pwd.showPasswords");
+      this.toggleButton.accessKey = gDatamanBundle.getString(this.showPasswords ? "pwd.hidePasswords.accesskey" : "pwd.showPasswords.accesskey");
+      this.pwdCol.hidden = !this.showPasswords;
+    }
+  },
+
+  _confirmShowPasswords: function() {
+    // This doesn't harm if passwords are not encrypted
+    let tokendb = Components.classes["@mozilla.org/security/pk11tokendb;1"]
+                            .createInstance(Components.interfaces.nsIPK11TokenDB);
+    let token = tokendb.getInternalKeyToken();
+
+    // If there is no master password, still give the user a chance to opt-out of displaying passwords
+    if (token.checkPassword(""))
+      return this._askUserShowPasswords();
+
+    // So there's a master password. But since checkPassword didn't succeed, we're logged out (per nsIPK11Token.idl).
+    try {
+      // Relogin and ask for the master password.
+      token.login(true);  // 'true' means always prompt for token password. User will be prompted until
+                          // clicking 'Cancel' or entering the correct password.
+    } catch (e) {
+      // An exception will be thrown if the user cancels the login prompt dialog.
+      // User is also logged out of Software Security Device.
+    }
+
+    return token.isLoggedIn();
+  },
+
+  _askUserShowPasswords: function() {
+    let dummy = { value: false };
+
+    // Confirm the user wants to display passwords
+    return Services.prompt.confirmEx(window,
+                                     null,
+                                     gDatamanBundle.getString("pwd.noMasterPasswordPrompt"),
+                                     Services.prompt.STD_YES_NO_BUTTONS,
+                                     null, null, null, null, dummy) == 0; // 0=="Yes" button
+  },
+
+  updateContext: function() {
+    Services.console.logStringMessage("Should update context menu");
+  },
+
+  copyPassword: function() {
+    Services.console.logStringMessage("Should copy password");
+  },
+};
+
+var passwordTreeView = {
+  get rowCount() {
+    return gPasswords.signons.length;
+  },
+  setTree: function(aTree) {},
+  getImageSrc: function(aRow, aColumn) {},
+  getProgressMode: function(aRow, aColumn) {},
+  getCellValue: function(aRow, aColumn) {},
+  getCellText: function(aRow, aColumn) {
+    let signon = gPasswords.signons[aRow];
+    switch (aColumn.id) {
+      case "pwdHostCol":
+        return signon.httpRealm ?
+               (signon.hostname + " (" + signon.httpRealm + ")") :
+               signon.hostname;
+      case "pwdUserCol":
+        return signon.username || "";
+      case "pwdPasswordCol":
+        return signon.password || "";
+    }
+  },
+  isSeparator: function(aIndex) { return false; },
+  isSorted: function() { return false; },
+  isContainer: function(aIndex) { return false; },
+  cycleHeader: function(aCol) {},
+  getRowProperties: function(aRow, aProp) {},
+  getColumnProperties: function(aColumn, aProp) {},
+  getCellProperties: function(aRow, aColumn, aProp) {}
 };
