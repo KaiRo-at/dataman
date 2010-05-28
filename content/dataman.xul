@@ -48,6 +48,10 @@
 <page xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
       id="data-page" title="&dataman.windowTitle;">
 
+  <stringbundleset id="datamanBundleSet">
+    <stringbundle id="datamanBundle" src="chrome://dataman/locale/dataman.properties"/>
+  </stringbundleset>
+
   <script type="application/javascript"
           src="chrome://dataman/content/dataman.js"/>
 

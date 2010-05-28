@@ -56,16 +56,12 @@
 <!ENTITY cookietree.expires.label "Expires">
 
 <!-- permissions -->
-<!ENTITY permUseDefault "Use Default">
-<!ENTITY permAskAlways "Always ask">
-<!ENTITY permAllow "Allow">
-<!ENTITY permAllowSession "Allow for Session">
-<!ENTITY permBlock "Block">
-<!ENTITY permImage "Load Images">
-<!ENTITY permPopup "Open Popup Windows">
-<!ENTITY permCookie "Set Cookies">
-<!ENTITY permInstall "Install Add-ons">
-<!ENTITY permGeo "Share Location">
+<!ENTITY perm.UseDefault "Use Default">
+<!ENTITY perm.AskAlways "Always ask">
+<!ENTITY perm.NeverSave "Never save">
+<!ENTITY perm.Allow "Allow">
+<!ENTITY perm.AllowSession "Allow for Session">
+<!ENTITY perm.Block "Block">
 
 <!-- overlay -->
 <!ENTITY datamanCmd.label "Data Manager">

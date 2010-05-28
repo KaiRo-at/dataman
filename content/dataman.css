@@ -35,27 +35,19 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-richlistitem[type="cookie"] {
-  -moz-binding: url('chrome://dataman/content/dataman.xml#cookie-item');
+richlistitem.permission[type="cookie"] {
+  -moz-binding: url('chrome://dataman/content/dataman.xml#perm-cookie-item');
 }
 
-richlistitem[type="geo"] {
-  -moz-binding: url('chrome://dataman/content/dataman.xml#geo-item');
+richlistitem.permission[type="geo"] {
+  -moz-binding: url('chrome://dataman/content/dataman.xml#perm-geo-item');
 }
 
-richlistitem[type="image"] {
-  -moz-binding: url('chrome://dataman/content/dataman.xml#image-item');
+richlistitem.permission[type="password"] {
+  -moz-binding: url('chrome://dataman/content/dataman.xml#perm-password-item');
 }
 
-richlistitem[type="install"] {
-  -moz-binding: url('chrome://dataman/content/dataman.xml#install-item');
-}
-
-richlistitem[type="popup"] {
-  -moz-binding: url('chrome://dataman/content/dataman.xml#popup-item');
-}
-
-/* generic item that gets used for any extended use of permissions */
-richlistitem[type]:not([type="cookie"]):not([type="image"]):not([type="install"]):not([type="popup"]):not([type="geo"]) {
-  -moz-binding: url('chrome://dataman/content/dataman.xml#generic-item');
+/* generic item gets used for permissions that don't need any special treatment */
+richlistitem.permission:not([type="cookie"]):not([type="geo"]):not([type="password"]) {
+  -moz-binding: url('chrome://dataman/content/dataman.xml#perm-generic-item');
 }

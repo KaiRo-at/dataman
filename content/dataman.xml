@@ -46,9 +46,23 @@
           xmlns:xul="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
           xmlns:xbl="http://www.mozilla.org/xbl">
 
-  <binding id="perm-base" extends="chrome://global/content/bindings/richlistbox.xml#richlistitem">
+  <binding id="perm-base-item" extends="chrome://global/content/bindings/richlistbox.xml#richlistitem">
     <implementation>
       <constructor><![CDATA[
+        var permLabel = document.getAnonymousElementByAttribute(this, "anonid", "permLabel");
+        switch (this.type) {
+          case "cookie":
+          case "geo":
+          case "image":
+          case "install":
+          case "password":
+          case "popup":
+            permLabel.value = gDatamanBundle.getString("perm." + this.type + ".label");
+            break;
+          default:
+            permLabel.value = this.type;
+            break;
+        }
         this._updateRadio();
       ]]></constructor>
 
@@ -98,128 +112,89 @@
         <parameter name="aValue"/>
         <body><![CDATA[
           Services.console.logStringMessage("Set capability: " + this.type + ", " + this.host + ", " + aValue);
+          // for setting pwd entry to allow:
+          // passwordmanager.setLoginSavingEnabled(host, true);
         ]]></body>
       </method>
 
     </implementation>
   </binding>
 
-  <binding id="generic-item" extends="chrome://dataman/content/dataman.xml#perm-base">
+  <binding id="perm-generic-item" extends="chrome://dataman/content/dataman.xml#perm-base-item">
     <content>
       <xul:hbox>
         <xul:label anonid="permHost" class="hostLabel" xbl:inherits="value=rawHost"/>
-        <xul:label anonid="permLabel" class="permissionLabel" xbl:inherits="value=type" control="radioGroup"/>
+        <xul:label anonid="permLabel" class="permissionLabel" control="radioGroup"/>
       </xul:hbox>
       <xul:hbox role="group" aria-labelledby="permLabel">
-        <xul:checkbox class="indent" anonid="useDefault" label="&permUseDefault;"
+        <xul:checkbox class="indent" anonid="useDefault" label="&perm.UseDefault;"
                       oncommand="document.getBindingParent(this).useDefault(this.checked);"/>
         <xul:spacer flex="1"/>
         <xul:radiogroup anonid="radioGroup" orient="horizontal">
-          <xul:radio anonid="permSetting-1" label="&permAllow;"
+          <xul:radio anonid="permSetting-1" label="&perm.Allow;"
                      oncommand="document.getBindingParent(this).setCapability(1);"/>
-          <xul:radio anonid="permSetting-2" label="&permBlock;"
+          <xul:radio anonid="permSetting-2" label="&perm.Block;"
                      oncommand="document.getBindingParent(this).setCapability(2);"/>
         </xul:radiogroup>
       </xul:hbox>
     </content>
   </binding>
 
-  <binding id="cookie-item" extends="chrome://dataman/content/dataman.xml#perm-base">
+  <binding id="perm-cookie-item" extends="chrome://dataman/content/dataman.xml#perm-base-item">
     <content>
       <xul:hbox>
         <xul:label anonid="permHost" class="hostLabel" xbl:inherits="value=rawHost"/>
-        <xul:label anonid="permLabel" class="permissionLabel" value="&permCookie;" control="radioGroup"/>
+        <xul:label anonid="permLabel" class="permissionLabel" control="radioGroup"/>
       </xul:hbox>
       <xul:hbox role="group" aria-labelledby="permLabel">
-        <xul:checkbox class="indent" anonid="useDefault" label="&permUseDefault;"
+        <xul:checkbox class="indent" anonid="useDefault" label="&perm.UseDefault;"
                       oncommand="document.getBindingParent(this).useDefault(this.checked);"/>
         <xul:spacer flex="1"/>
         <xul:radiogroup anonid="radioGroup" orient="horizontal">
-          <xul:radio anonid="permSetting-1" label="&permAllow;"
+          <xul:radio anonid="permSetting-1" label="&perm.Allow;"
                      oncommand="document.getBindingParent(this).setCapability(1);"/>
-          <xul:radio anonid="permSetting-8" label="&permAllowSession;"
+          <xul:radio anonid="permSetting-8" label="&perm.AllowSession;"
                      oncommand="document.getBindingParent(this).setCapability(8);"/>
-          <xul:radio anonid="permSetting-2" label="&permBlock;"
+          <xul:radio anonid="permSetting-2" label="&perm.Block;"
                      oncommand="document.getBindingParent(this).setCapability(2);"/>
         </xul:radiogroup>
       </xul:hbox>
     </content>
   </binding>
 
-  <binding id="geo-item" extends="chrome://dataman/content/dataman.xml#perm-base">
+  <binding id="perm-geo-item" extends="chrome://dataman/content/dataman.xml#perm-base-item">
     <content>
       <xul:hbox>
         <xul:label anonid="permHost" class="hostLabel" xbl:inherits="value=rawHost"/>
-        <xul:label anonid="permLabel" class="permissionLabel" value="&permGeo;" control="radioGroup"/>
+        <xul:label anonid="permLabel" class="permissionLabel" control="radioGroup"/>
       </xul:hbox>
       <xul:hbox role="group" aria-labelledby="permLabel">
-        <xul:checkbox class="indent" anonid="useDefault" label="&permUseDefault;"
+        <xul:checkbox class="indent" anonid="useDefault" label="&perm.AskAlways;"
                       oncommand="document.getBindingParent(this).useDefault(this.checked);"/>
         <xul:spacer flex="1"/>
         <xul:radiogroup anonid="radioGroup" orient="horizontal">
-          <xul:radio anonid="permSetting-1" label="&permAllow;"
+          <xul:radio anonid="permSetting-1" label="&perm.Allow;"
                      oncommand="document.getBindingParent(this).setCapability(1);"/>
-          <xul:radio anonid="permSetting-2" label="&permBlock;"
+          <xul:radio anonid="permSetting-2" label="&perm.Block;"
                      oncommand="document.getBindingParent(this).setCapability(2);"/>
         </xul:radiogroup>
       </xul:hbox>
     </content>
   </binding>
 
-  <binding id="image-item" extends="chrome://dataman/content/dataman.xml#perm-base">
+  <binding id="perm-password-item" extends="chrome://dataman/content/dataman.xml#perm-base-item">
     <content>
       <xul:hbox>
         <xul:label anonid="permHost" class="hostLabel" xbl:inherits="value=rawHost"/>
-        <xul:label anonid="permLabel" class="permissionLabel" value="&permImage;" control="radioGroup"/>
+        <xul:label anonid="permLabel" class="permissionLabel" control="radioGroup"/>
       </xul:hbox>
       <xul:hbox role="group" aria-labelledby="permLabel">
-        <xul:checkbox class="indent" anonid="useDefault" label="&permUseDefault;"
-                      oncommand="document.getBindingParent(this).useDefault(this.checked);"/>
+        <xul:checkbox class="indent" anonid="useDefault" hidden="true"/>
         <xul:spacer flex="1"/>
         <xul:radiogroup anonid="radioGroup" orient="horizontal">
-          <xul:radio anonid="permSetting-1" label="&permAllow;"
+          <xul:radio anonid="permSetting-1" label="&perm.AskAlways;"
                      oncommand="document.getBindingParent(this).setCapability(1);"/>
-          <xul:radio anonid="permSetting-2" label="&permBlock;"
-                     oncommand="document.getBindingParent(this).setCapability(2);"/>
-        </xul:radiogroup>
-      </xul:hbox>
-    </content>
-  </binding>
-
-  <binding id="install-item" extends="chrome://dataman/content/dataman.xml#perm-base">
-    <content>
-      <xul:hbox>
-        <xul:label anonid="permHost" class="hostLabel" xbl:inherits="value=rawHost"/>
-        <xul:label anonid="permLabel" class="permissionLabel" value="&permInstall;" control="radioGroup"/>
-      </xul:hbox>
-      <xul:hbox role="group" aria-labelledby="permLabel">
-        <xul:checkbox class="indent" anonid="useDefault" label="&permUseDefault;"
-                      oncommand="document.getBindingParent(this).useDefault(this.checked);"/>
-        <xul:spacer flex="1"/>
-        <xul:radiogroup anonid="radioGroup" orient="horizontal">
-          <xul:radio anonid="permSetting-1" label="&permAllow;"
-                     oncommand="document.getBindingParent(this).setCapability(1);"/>
-          <xul:radio anonid="permSetting-2" label="&permBlock;"
-                     oncommand="document.getBindingParent(this).setCapability(2);"/>
-        </xul:radiogroup>
-      </xul:hbox>
-    </content>
-  </binding>
-
-  <binding id="popup-item" extends="chrome://dataman/content/dataman.xml#perm-base">
-    <content>
-      <xul:hbox>
-        <xul:label anonid="permHost" class="hostLabel" xbl:inherits="value=rawHost"/>
-        <xul:label anonid="permLabel" class="permissionLabel" value="&permPopup;" control="radioGroup"/>
-      </xul:hbox>
-      <xul:hbox role="group" aria-labelledby="permLabel">
-        <xul:checkbox class="indent" anonid="useDefault" label="&permUseDefault;"
-                      oncommand="document.getBindingParent(this).useDefault(this.checked);"/>
-        <xul:spacer flex="1"/>
-        <xul:radiogroup anonid="radioGroup" orient="horizontal">
-          <xul:radio anonid="permSetting-1" label="&permAllow;"
-                     oncommand="document.getBindingParent(this).setCapability(1);"/>
-          <xul:radio anonid="permSetting-2" label="&permBlock;"
+          <xul:radio anonid="permSetting-2" label="&perm.NeverSave;"
                      oncommand="document.getBindingParent(this).setCapability(2);"/>
         </xul:radiogroup>
       </xul:hbox>

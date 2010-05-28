@@ -61,7 +61,7 @@ XPCOMUtils.defineLazyServiceGetter(gLocSvc, "date",
 var gDatamanBundle = null;
 
 function initialize() {
-  gDatamanBundle = document.getElementById("datamonBundle");
+  gDatamanBundle = document.getElementById("datamanBundle");
   gDomains.initialize();
   gTabs.initialize();
 }
@@ -96,6 +96,11 @@ var gDomains = {
       nextPermission = nextPermission.QueryInterface(Components.interfaces.nsIPermission);
       this._addDomainOrFlag(nextPermission.host.replace(/^\./, ""), "hasPermissions", false);
     }
+    // add domains for password rejects to permissions
+    let rejectHosts = gLocSvc.pwd.getAllDisabledHosts();
+    for (let i = 0; i < rejectHosts.length; i++) {
+      this._addDomainOrFlag(rejectHosts[i], "hasPermissions", true);
+    }
 
     // add domains for content prefs
     try {
@@ -121,12 +126,23 @@ var gDomains = {
     // find the base domain name for the given host name
     var domain;
     if (aHostIsURI) {
-      let hostURI = Services.io.newURI(aHostname, null, null);
       try {
-        domain = gLocSvc.eTLD.getBaseDomain(hostURI);
+        let hostURI = Services.io.newURI(aHostname, null, null);
+        try {
+          domain = gLocSvc.eTLD.getBaseDomain(hostURI);
+        }
+        catch (e) {
+          domain = hostURI.host;
+        }
       }
       catch (e) {
-        domain = hostURI.host;
+        Components.utils.reportError(e + "\nOffending Non-URI Hostname is: " + aHostname);
+        try {
+          domain = gLocSvc.eTLD.getBaseDomainFromHost(aHostname);
+        }
+        catch (e) {
+          domain = aHostname;
+        }
       }
     }
     else {
@@ -417,6 +433,20 @@ var gPerms = {
         permElem.setAttribute("host", nextPermission.host);
         permElem.setAttribute("rawHost", (host.charAt(0) == ".") ? host.substring(1, host.length) : host);
         permElem.setAttribute("capability", nextPermission.capability);
+        permElem.setAttribute("class", "permission");
+        permElem.setAttribute("orient", "vertical");
+        this.list.appendChild(permElem);
+      }
+    }
+    // visually treat password rejects like permissions
+    let rejectHosts = gLocSvc.pwd.getAllDisabledHosts();
+    for (let i = 0; i < rejectHosts.length; i++) {
+      if (gDomains.hostMatchesSelected(rejectHosts[i], true)) {
+        let permElem = document.createElement("richlistitem");
+        permElem.setAttribute("type", "password");
+        permElem.setAttribute("host", rejectHosts[i]);
+        permElem.setAttribute("rawHost", gDomains.getDomainFromHost(rejectHosts[i], true));
+        permElem.setAttribute("capability", 2);
         permElem.setAttribute("class", "permission");
         permElem.setAttribute("orient", "vertical");
         this.list.appendChild(permElem);
