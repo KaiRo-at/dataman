@@ -37,6 +37,7 @@
    - ***** END LICENSE BLOCK ***** -->
 
 <?xml-stylesheet href="chrome://communicator/skin/" type="text/css"?>
+<?xml-stylesheet href="chrome://dataman/content/dataman.css" type="text/css"?>
 <?xml-stylesheet href="chrome://dataman/skin/dataman.css" type="text/css"?>
 
 <!DOCTYPE page [
@@ -100,7 +101,8 @@
         </vbox>
 
         <vbox id="permissionsPanel" flex="1">
-          <description value="dataman: permissions panel"/>
+          <richlistbox id="permList" flex="1">
+          </richlistbox>
         </vbox>
 
         <vbox id="preferencesPanel" flex="1">

@@ -55,6 +55,18 @@
 <!ENTITY cookietree.name.label "Cookie Name">
 <!ENTITY cookietree.expires.label "Expires">
 
+<!-- permissions -->
+<!ENTITY permUseDefault "Use Default">
+<!ENTITY permAskAlways "Always ask">
+<!ENTITY permAllow "Allow">
+<!ENTITY permAllowSession "Allow for Session">
+<!ENTITY permBlock "Block">
+<!ENTITY permImage "Load Images">
+<!ENTITY permPopup "Open Popup Windows">
+<!ENTITY permCookie "Set Cookies">
+<!ENTITY permInstall "Install Add-ons">
+<!ENTITY permGeo "Share Location">
+
 <!-- overlay -->
 <!ENTITY datamanCmd.label "Data Manager">
 <!ENTITY datamanCmd.accesskey "M">

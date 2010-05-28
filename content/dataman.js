@@ -58,7 +58,7 @@ XPCOMUtils.defineLazyServiceGetter(gLocSvc, "date",
                                    "@mozilla.org/intl/scriptabledateformat;1",
                                    "nsIScriptableDateFormat");
 
-gDatamanBundle = null;
+var gDatamanBundle = null;
 
 function initialize() {
   gDatamanBundle = document.getElementById("datamonBundle");
@@ -205,23 +205,23 @@ var domainTreeView = {
   get rowCount() {
     return gDomains.displayedDomains.length;
   },
-  setTree: function(tree) {},
-  getImageSrc: function(row, column) {},
-  getProgressMode: function(row, column) {},
-  getCellValue: function(row, column) {},
-  getCellText: function(row, column) {
-    switch (column.id) {
+  setTree: function(aTree) {},
+  getImageSrc: function(aRow, aColumn) {},
+  getProgressMode: function(aRow, aColumn) {},
+  getCellValue: function(aRow, aColumn) {},
+  getCellText: function(aRow, aColumn) {
+    switch (aColumn.id) {
       case "domainCol":
-        return gDomains.domainObjects[gDomains.displayedDomains[row]].title;
+        return gDomains.domainObjects[gDomains.displayedDomains[aRow]].title;
     }
   },
-  isSeparator: function(index) { return false; },
+  isSeparator: function(aIndex) { return false; },
   isSorted: function() { return false; },
-  isContainer: function(index) { return false; },
+  isContainer: function(aIndex) { return false; },
   cycleHeader: function(aCol) {},
-  getRowProperties: function(row, prop) {},
-  getColumnProperties: function(column, prop) {},
-  getCellProperties: function(row, column, prop) {}
+  getRowProperties: function(aRow, aProp) {},
+  getColumnProperties: function(aColumn, aProp) {},
+  getCellProperties: function(aRow, aColumn, aProp) {}
 };
 
 
@@ -253,6 +253,7 @@ var gTabs = {
           gCookies.shutdown();
           break;
         case "permissionsPanel":
+          gPerms.shutdown();
           break;
         case "preferencesPanel":
           break;
@@ -274,6 +275,7 @@ var gTabs = {
         gCookies.initialize();
         break;
       case "permissionsPanel":
+        gPerms.initialize();
         break;
       case "preferencesPanel":
         break;
@@ -354,7 +356,6 @@ var gCookies = {
   },
 
   handleKeyPress: function(aEvent) {
-    Services.console.logStringMessage("Key Pressed: " + aEvent.keyCode);
     if (aEvent.keyCode == KeyEvent.DOM_VK_DELETE) {
       this.delete();
     }
@@ -394,4 +395,38 @@ var cookieTreeView = {
   getRowProperties: function(aRow, aProp) {},
   getColumnProperties: function(aColumn, aProp) {},
   getCellProperties: function(aRow, aColumn, aProp) {}
+};
+
+
+var gPerms = {
+  list: null,
+
+  perms: [],
+
+  initialize: function() {
+    this.list = document.getElementById("permList");
+
+    let enumerator = Services.perms.enumerator;
+    while (enumerator.hasMoreElements()) {
+      let nextPermission = enumerator.getNext();
+      nextPermission = nextPermission.QueryInterface(Components.interfaces.nsIPermission);
+      let host = nextPermission.host;
+      if (gDomains.hostMatchesSelected(host.replace(/^\./, ""), false)) {
+        let permElem = document.createElement("richlistitem");
+        permElem.setAttribute("type", nextPermission.type);
+        permElem.setAttribute("host", nextPermission.host);
+        permElem.setAttribute("rawHost", (host.charAt(0) == ".") ? host.substring(1, host.length) : host);
+        permElem.setAttribute("capability", nextPermission.capability);
+        permElem.setAttribute("class", "permission");
+        permElem.setAttribute("orient", "vertical");
+        this.list.appendChild(permElem);
+      }
+    }
+  },
+
+  shutdown: function() {
+    while (this.list.hasChildNodes())
+      this.list.removeChild(this.list.firstChild);
+    this.perms = [];
+  },
 };
