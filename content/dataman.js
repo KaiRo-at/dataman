@@ -57,6 +57,9 @@ XPCOMUtils.defineLazyServiceGetter(gLocSvc, "pwd",
 XPCOMUtils.defineLazyServiceGetter(gLocSvc, "date",
                                    "@mozilla.org/intl/scriptabledateformat;1",
                                    "nsIScriptableDateFormat");
+XPCOMUtils.defineLazyServiceGetter(gLocSvc, "fhist",
+                                   "@mozilla.org/satchel/form-history;1",
+                                   "nsIFormHistory2");
 
 var gDatamanBundle = null;
 
@@ -277,6 +280,7 @@ var gTabs = {
           gPasswords.shutdown();
           break;
         case "formdataPanel":
+          gFormdata.shutdown();
           break;
         case "forgetPanel":
           break;
@@ -300,6 +304,7 @@ var gTabs = {
         gPasswords.initialize();
         break;
       case "formdataPanel":
+        gFormdata.initialize();
         break;
       case "forgetPanel":
         break;
@@ -583,6 +588,115 @@ var passwordTreeView = {
         return signon.username || "";
       case "pwdPasswordCol":
         return signon.password || "";
+    }
+  },
+  isSeparator: function(aIndex) { return false; },
+  isSorted: function() { return false; },
+  isContainer: function(aIndex) { return false; },
+  cycleHeader: function(aCol) {},
+  getRowProperties: function(aRow, aProp) {},
+  getColumnProperties: function(aColumn, aProp) {},
+  getCellProperties: function(aRow, aColumn, aProp) {}
+};
+
+
+var gFormdata = {
+  tree: null,
+
+  formdata: [],
+
+  initialize: function() {
+    this.tree = document.getElementById("formdataTree");
+    this.tree.treeBoxObject.view = formdataTreeView;
+
+    this.tree.treeBoxObject.beginUpdateBatch();
+    try {
+      var statement = gLocSvc.fhist.DBConnection.createStatement("SELECT fieldname, value, timesUsed, firstUsed, lastUsed, guid FROM moz_formhistory");
+      while (statement.executeStep()) {
+        this.formdata.push({fieldname: statement.row["fieldname"],
+                            value: statement.row["value"],
+                            timesUsed: statement.row["timesUsed"],
+                            firstUsed: this._getTimeString(statement.row["firstUsed"]),
+                            firstUsedSortValue: statement.row["firstUsed"],
+                            lastUsed: this._getTimeString(statement.row["lastUsed"]),
+                            lastUsedSortValue: statement.row["lastUsed"],
+                            guid: statement.row["guid"]}
+                         );
+      }
+    }
+    finally {
+      statement.reset();
+    }
+    this.tree.treeBoxObject.endUpdateBatch();
+    this.tree.treeBoxObject.invalidate();
+  },
+
+  shutdown: function() {
+    this.tree.treeBoxObject.view = null;
+    this.formdata = [];
+  },
+
+  _getTimeString: function formdata_getTimeString(aTimestamp) {
+    if (aTimestamp) {
+      let date = new Date(aTimestamp / 1000);
+
+      // If a date has an extreme value, the dateservice can't cope with it
+      // properly, so we'll just return a blank string
+      // see bug 238045 for details
+      let dtString = "";
+      try {
+        dtString = gLocSvc.date.FormatDateTime("", gLocSvc.date.dateFormatLong,
+                                               gLocSvc.date.timeFormatSeconds,
+                                               date.getFullYear(), date.getMonth()+1,
+                                               date.getDate(), date.getHours(),
+                                               date.getMinutes(), date.getSeconds());
+      } catch(ex) {
+        // do nothing
+      }
+      return dtString;
+    }
+    return "";
+  },
+
+  select: function() {
+    Services.console.logStringMessage("Selected: " + this.tree.currentIndex);
+  },
+
+  handleKeyPress: function(aEvent) {
+    if (aEvent.keyCode == KeyEvent.DOM_VK_DELETE) {
+      this.delete();
+    }
+  },
+
+  sort: function(aColumn, aUpdateSelection) {
+    Services.console.logStringMessage("Sort: " + aColumn);
+  },
+
+  delete: function() {
+    Services.console.logStringMessage("Form data entry delete requested");
+  },
+};
+
+var formdataTreeView = {
+  get rowCount() {
+    return gFormdata.formdata.length;
+  },
+  setTree: function(aTree) {},
+  getImageSrc: function(aRow, aColumn) {},
+  getProgressMode: function(aRow, aColumn) {},
+  getCellValue: function(aRow, aColumn) {},
+  getCellText: function(aRow, aColumn) {
+    switch (aColumn.id) {
+      case "fdataFieldCol":
+        return gFormdata.formdata[aRow].fieldname;
+      case "fdataValueCol":
+        return gFormdata.formdata[aRow].value;
+      case "fdataCountCol":
+        return gFormdata.formdata[aRow].timesUsed;
+      case "fdataFirstCol":
+        return gFormdata.formdata[aRow].firstUsed;
+      case "fdataLastCol":
+        return gFormdata.formdata[aRow].lastUsed;
     }
   },
   isSeparator: function(aIndex) { return false; },

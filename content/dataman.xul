@@ -135,8 +135,8 @@
                 context="passwordsTreeContextMenu">
             <treecols>
               <treecol id="pwdHostCol" label="&pwdtree.host.label;" flex="5"
-                      onclick="gPasswords.sort('hostname');" persist="width"
-                      sortDirection="ascending"/>
+                       onclick="gPasswords.sort('hostname');" persist="width"
+                       sortDirection="ascending"/>
               <splitter class="tree-splitter"/>
               <treecol id="pwdUserCol" label="&pwdtree.username.label;" flex="2"
                        onclick="gPasswords.sort('username');" persist="width"/>
@@ -155,7 +155,29 @@
         </vbox>
 
         <vbox id="formdataPanel" flex="1">
-          <description value="dataman: form data panel"/>
+          <description value="&formdata.description;"/>
+          <tree id="formdataTree" flex="1"
+                    onkeypress="gFormdata.handleKeyPress(event)"
+                    onselect="gFormdata.select();">
+            <treecols>
+              <treecol id="fdataFieldCol" label="&fdatatree.fieldname.label;" flex="5"
+                       onclick="gFormdata.sort('fieldname', true);" persist="width hidden"
+                       sortDirection="ascending"/>
+              <splitter class="tree-splitter"/>
+              <treecol id="fdataValueCol" label="&fdatatree.value.label;" flex="10"
+                       onclick="gFormdata.sort('value', true);" persist="width hidden"/>
+              <splitter class="tree-splitter"/>
+              <treecol id="fdataCountCol" label="&fdatatree.usecount.label;" flex="2"
+                       hidden="true" onclick="gFormdata.sort('timeUsed', true);" persist="width hidden"/>
+              <splitter class="tree-splitter"/>
+              <treecol id="fdataFirstCol" label="&fdatatree.firstused.label;" flex="10"
+                       hidden="true" onclick="gFormdata.sort('firstUsed', true);" persist="width hidden"/>
+              <splitter class="tree-splitter"/>
+              <treecol id="fdataLastCol" label="&fdatatree.lastused.label;" flex="10"
+                       hidden="true" onclick="gFormdata.sort('lastUsed', true);" persist="width hidden"/>
+            </treecols>
+            <treechildren/>
+          </tree>
         </vbox>
 
         <vbox id="forgetPanel" flex="1">
