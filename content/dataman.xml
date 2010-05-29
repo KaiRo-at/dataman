@@ -96,24 +96,37 @@
 
       <method name="_updateRadio">
         <body><![CDATA[
-          var radio = document.getAnonymousElementByAttribute(this, "anonid", "permSetting-" + this.capability);
-          radio.radioGroup.selectedItem = radio;
+          if (this.capability) {
+            let radio = document.getAnonymousElementByAttribute(this, "anonid", "permSetting-" + this.capability);
+            radio.radioGroup.selectedItem = radio;
+          }
+          else {
+            let radioGroup = document.getAnonymousElementByAttribute(this, "anonid", "radioGroup");
+            radioGroup.selectedIndex = -1;
+          }
         ]]></body>
       </method>
 
       <method name="useDefault">
         <parameter name="aChecked"/>
         <body><![CDATA[
-          Services.console.logStringMessage("Use default: " + this.type + ", " + this.host + ", " + aChecked);
+          let radioGroup = document.getAnonymousElementByAttribute(this, "anonid", "radioGroup");
+          radioGroup.disabled = aChecked;
+          if (aChecked) {
+            Services.perms.remove(this.host, this.type);
+            this.capability = gPerms.getDefault(this.type);
+          }
+          this._updateRadio();
         ]]></body>
       </method>
 
       <method name="setCapability">
         <parameter name="aValue"/>
         <body><![CDATA[
-          Services.console.logStringMessage("Set capability: " + this.type + ", " + this.host + ", " + aValue);
-          // for setting pwd entry to allow:
-          // passwordmanager.setLoginSavingEnabled(host, true);
+          if (this.type == "password")
+            gLocSvc.pwd.setLoginSavingEnabled(this.host, aValue == Services.perms.ALLOW_ACTION);
+          else
+            Services.perms.add(Services.io.newURI("http://" + this.host, null, null), this.type, aValue);
         ]]></body>
       </method>
 

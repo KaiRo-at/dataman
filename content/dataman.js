@@ -541,6 +541,36 @@ var gPerms = {
     while (this.list.hasChildNodes())
       this.list.removeChild(this.list.firstChild);
   },
+
+  // Most functions of permissions are in the XBL items!
+
+  getDefault: function permissions_getDefault(aType) {
+    switch (aType) {
+      case "cookie":
+        if (Services.prefs.getIntPref("network.cookie.cookieBehavior") == 2)
+          return Services.perms.DENY_ACTION;
+        if (Services.prefs.getIntPref("network.cookie.lifetimePolicy") == 2)
+          return Components.interfaces.nsICookiePermission.ACCESS_SESSION;
+        return Services.perms.ALLOW_ACTION;
+      case "geo":
+        return Services.perms.DENY_ACTION;
+      case "image":
+        if (Services.prefs.getIntPref("permissions.default.image") == 2)
+          return Services.perms.DENY_ACTION;
+        return Services.perms.ALLOW_ACTION;
+      case "install":
+        if (Services.prefs.getBoolPref("xpinstall.whitelist.required"))
+          return Services.perms.DENY_ACTION;
+        return Services.perms.ALLOW_ACTION;
+      case "password":
+        return Services.perms.ALLOW_ACTION;
+      case "popup":
+        if (Services.prefs.getBoolPref("dom.disable_open_during_load"))
+          return Services.perms.DENY_ACTION;
+        return Services.perms.ALLOW_ACTION;
+    }
+    return false;
+  },
 };
 
 
