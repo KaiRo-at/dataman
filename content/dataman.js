@@ -81,7 +81,7 @@ var gDomains = {
 
   initialize: function() {
     this.tree = document.getElementById("domainTree");
-    this.tree.treeBoxObject.view = domainTreeView;
+    this.tree.view = domainTreeView;
 
     // global "domain"
     this.domainObjects.push({title: "*", hasFormData: true});
@@ -306,19 +306,38 @@ var gTabs = {
         break;
     }
     this.activePanel = this.tabbox.selectedPanel.id;
-    Services.console.logStringMessage("Selected: " + this.tabbox.selectedPanel.id);
   },
 };
 
 
 var gCookies = {
   tree: null,
+  cookieInfoName: null,
+  cookieInfoValue: null,
+  cookieInfoHostLabel: null,
+  cookieInfoHost: null,
+  cookieInfoPath: null,
+  cookieInfoIsSecure: null,
+  cookieInfoExpires: null,
+  removeButton: null,
+  blockOnRemove: null,
 
   cookies: [],
 
-  initialize: function() {
+  initialize: function cookies_initialize() {
     this.tree = document.getElementById("cookiesTree");
-    this.tree.treeBoxObject.view = cookieTreeView;
+    this.tree.view = cookieTreeView;
+
+    this.cookieInfoName = document.getElementById("cookieInfoName");
+    this.cookieInfoValue = document.getElementById("cookieInfoValue");
+    this.cookieInfoHostLabel = document.getElementById("cookieInfoHostLabel");
+    this.cookieInfoHost = document.getElementById("cookieInfoHost");
+    this.cookieInfoPath = document.getElementById("cookieInfoPath");
+    this.cookieInfoIsSecure = document.getElementById("cookieInfoIsSecure");
+    this.cookieInfoExpires = document.getElementById("cookieInfoExpires");
+
+    this.removeButton = document.getElementById("cookieRemove");
+    this.blockOnRemove = document.getElementById("cookieBlockOnRemove");
 
     this.tree.treeBoxObject.beginUpdateBatch();
     let enumerator = gLocSvc.cookie.enumerator;
@@ -343,12 +362,13 @@ var gCookies = {
     this.tree.treeBoxObject.invalidate();
   },
 
-  shutdown: function() {
-    this.tree.treeBoxObject.view = null;
+  shutdown: function cookies_shutdown() {
+    this.tree.view.selection.clearSelection();
+    this.tree.view = null;
     this.cookies = [];
   },
 
-  _getExpiresString: function cookies_getExpiresString(aExpires) {
+  _getExpiresString: function cookies__getExpiresString(aExpires) {
     if (aExpires) {
       let date = new Date(1000 * aExpires);
 
@@ -370,22 +390,84 @@ var gCookies = {
     return gDatamanBundle.getString("cookies.expireAtEndOfSession");
   },
 
-  select: function() {
-    Services.console.logStringMessage("Selected: " + this.tree.currentIndex);
+  select: function cookies_select() {
+    var selections = gDatamanUtils.getTreeSelections(this.tree);
+    this.removeButton.disabled = !selections.length;
+    if (!selections.length) {
+      this._clearCookieInfo();
+      return true;
+    }
+
+    if (selections.length > 1) {
+      this._clearCookieInfo();
+      return true;
+    }
+
+    // At this point, we have a single cookie selected.
+    var idx = selections[0];
+
+    this.cookieInfoName.value = this.cookies[idx].name;
+    this.cookieInfoValue.value = this.cookies[idx].value;
+    this.cookieInfoHostLabel.value = this.cookies[idx].isDomain ?
+                                     this.cookieInfoHostLabel.getAttribute("value_domain") :
+                                     this.cookieInfoHostLabel.getAttribute("value_host");
+    this.cookieInfoHost.value = this.cookies[idx].host;
+    this.cookieInfoPath.value = this.cookies[idx].path;
+    this.cookieInfoIsSecure.value = gDatamanBundle.getString(this.cookies[idx].isSecure ?
+                                                             "cookies.secureOnly" :
+                                                             "cookies.anyConnection");
+    this.cookieInfoExpires.value = this.cookies[idx].expires;
+    return true;
   },
 
-  handleKeyPress: function(aEvent) {
+  _clearCookieInfo: function cookies__clearCookieInfo() {
+    var fields = ["cookieInfoName", "cookieInfoValue", "cookieInfoHost",
+                  "cookieInfoPath", "cookieInfoIsSecure", "cookieInfoExpires"];
+    for (let i = 0; i < fields.length; i++) {
+      this[fields[i]].value = "";
+    }
+    this.cookieInfoHostLabel.value = this.cookieInfoHostLabel.getAttribute("value_host");
+  },
+
+  handleKeyPress: function cookies_handleKeyPress(aEvent) {
     if (aEvent.keyCode == KeyEvent.DOM_VK_DELETE) {
       this.delete();
     }
+    else if (aEvent.ctrlKey &&
+             String.fromCharCode(aEvent.charCode).toLocaleLowerCase() ==
+               this.tree.getAttribute("selectAllKey").charAt(0).toLocaleLowerCase()) {
+      this.tree.view.selection.selectAll();
+    }
   },
 
-  sort: function(aColumn, aUpdateSelection) {
+  sort: function cookies_sort(aColumn, aUpdateSelection) {
     Services.console.logStringMessage("Sort: " + aColumn);
   },
 
-  delete: function() {
-    Services.console.logStringMessage("Cookie delete requested");
+  delete: function cookies_delete() {
+    var selections = gDatamanUtils.getTreeSelections(this.tree);
+
+    if (selections.length > 1) {
+      let title = gDatamanBundle.getString("cookies.deleteSelectedTitle");
+      let msg = gDatamanBundle.getString("cookies.deleteSelected");
+      let flags = ((Services.prompt.BUTTON_TITLE_IS_STRING * Services.prompt.BUTTON_POS_0) +
+                   (Services.prompt.BUTTON_TITLE_CANCEL * Services.prompt.BUTTON_POS_1) +
+                   Services.prompt.BUTTON_POS_1_DEFAULT)
+      let yes = gDatamanBundle.getString("cookies.deleteSelectedYes");
+      if (Services.prompt.confirmEx(window, title, msg, flags, yes, null, null,
+                                    null, {value: 0}) == 1) // 1=="Cancel" button
+        return;
+    }
+
+    this.tree.view.selection.clearSelection();
+    // Loop backwards so later indexes in the list don't change.
+    for (let i = selections.length - 1; i >= 0; i--) {
+      let delCookie = this.cookies[selections[i]];
+      this.cookies.splice(i, 1);
+      this.tree.treeBoxObject.rowCountChanged(i, -1);
+      gLocSvc.cookie.remove(delCookie.host, delCookie.name, delCookie.path,
+                            this.blockOnRemove.checked);
+    }
   },
 };
 
@@ -472,7 +554,7 @@ var gPasswords = {
 
   initialize: function() {
     this.tree = document.getElementById("passwordsTree");
-    this.tree.treeBoxObject.view = passwordTreeView;
+    this.tree.view = passwordTreeView;
 
     this.toggleButton = document.getElementById("pwdToggle");
     this.toggleButton.label = gDatamanBundle.getString("pwd.showPasswords");
@@ -491,7 +573,10 @@ var gPasswords = {
   },
 
   shutdown: function() {
-    this.tree.treeBoxObject.view = null;
+    if (this.showPasswords)
+      this.togglePasswordVisible();
+    this.tree.view.selection.clearSelection();
+    this.tree.view = null;
     this.signons = [];
   },
 
@@ -546,14 +631,12 @@ var gPasswords = {
   },
 
   _askUserShowPasswords: function() {
-    let dummy = { value: false };
-
     // Confirm the user wants to display passwords
     return Services.prompt.confirmEx(window,
                                      null,
                                      gDatamanBundle.getString("pwd.noMasterPasswordPrompt"),
                                      Services.prompt.STD_YES_NO_BUTTONS,
-                                     null, null, null, null, dummy) == 0; // 0=="Yes" button
+                                     null, null, null, null, { value: false }) == 0; // 0=="Yes" button
   },
 
   updateContext: function() {
@@ -603,7 +686,7 @@ var gPrefs = {
 
   initialize: function() {
     this.tree = document.getElementById("prefsTree");
-    this.tree.treeBoxObject.view = prefsTreeView;
+    this.tree.view = prefsTreeView;
 
     this.tree.treeBoxObject.beginUpdateBatch();
     try {
@@ -629,7 +712,8 @@ var gPrefs = {
   },
 
   shutdown: function() {
-    this.tree.treeBoxObject.view = null;
+    this.tree.view.selection.clearSelection();
+    this.tree.view = null;
     this.prefs = [];
   },
 
@@ -687,7 +771,7 @@ var gFormdata = {
 
   initialize: function() {
     this.tree = document.getElementById("formdataTree");
-    this.tree.treeBoxObject.view = formdataTreeView;
+    this.tree.view = formdataTreeView;
 
     this.tree.treeBoxObject.beginUpdateBatch();
     try {
@@ -713,7 +797,8 @@ var gFormdata = {
   },
 
   shutdown: function() {
-    this.tree.treeBoxObject.view = null;
+    this.tree.view.selection.clearSelection();
+    this.tree.view = null;
     this.formdata = [];
   },
 
@@ -788,3 +873,25 @@ var formdataTreeView = {
   getColumnProperties: function(aColumn, aProp) {},
   getCellProperties: function(aRow, aColumn, aProp) {}
 };
+
+
+gDatamanUtils = {
+  getTreeSelections: function datamanUtils_getTreeSelections(aTree) {
+    let selections = [];
+    let select = aTree.view.selection;
+    if (select) {
+      let count = select.getRangeCount();
+      let min = new Object();
+      let max = new Object();
+      for (let i = 0; i < count; i++) {
+        select.getRangeAt(i, min, max);
+        for (var k=min.value; k<=max.value; k++) {
+          if (k != -1) {
+            selections[selections.length] = k;
+          }
+        }
+      }
+    }
+    return selections;
+  },
+}

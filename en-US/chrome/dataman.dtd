@@ -55,6 +55,24 @@
 <!ENTITY cookietree.name.label "Cookie Name">
 <!ENTITY cookietree.expires.label "Expires">
 
+<!ENTITY cookietree.selectAll.key "A">
+
+<!ENTITY cookies.infobox.label "Information about the selected Cookie">
+
+<!ENTITY cookies.info.name.label "Name:">
+<!ENTITY cookies.info.value.label "Content:">
+<!ENTITY cookies.info.host.label "Host:">
+<!ENTITY cookies.info.domain.label "Domain:">
+<!ENTITY cookies.info.path.label "Path:">
+<!ENTITY cookies.info.secure.label "Send For:">
+<!ENTITY cookies.info.expires.label "Expires:">
+
+<!ENTITY cookies.button.remove.label "Remove">
+<!ENTITY cookies.button.remove.accesskey "R">
+
+<!ENTITY cookies.blockOnRemove.label "When removing, block the listed websites from setting future cookies">
+<!ENTITY cookies.blockOnRemove.accesskey "W">
+
 <!-- permissions -->
 <!ENTITY perm.UseDefault "Use Default">
 <!ENTITY perm.AskAlways "Always ask">

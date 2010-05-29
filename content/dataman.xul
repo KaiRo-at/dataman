@@ -104,7 +104,8 @@
           <description value="&cookies.description;"/>
           <tree id="cookiesTree" flex="1"
                     onkeypress="gCookies.handleKeyPress(event)"
-                    onselect="gCookies.select();">
+                    onselect="gCookies.select();"
+                    selectAllKey="&cookietree.selectAll.key;">
             <treecols>
               <treecol id="cookieHostCol" label="&cookietree.host.label;" flex="5"
                        onclick="gCookies.sort('rawHost', true);" persist="width hidden"
@@ -118,6 +119,74 @@
             </treecols>
             <treechildren/>
           </tree>
+          <groupbox>
+            <caption label="&cookies.infobox.label;"/>
+            <!-- labels -->
+            <grid flex="1">
+              <columns>
+                <column/>
+                <column flex="1"/>
+              </columns>
+              <rows>
+
+                <row align="center">
+                  <hbox align="center" pack="end">
+                    <label value="&cookies.info.name.label;" control="cookieInfoName"/>
+                  </hbox>
+                  <textbox id="cookieInfoName" readonly="true" class="plain"/>
+                </row>
+
+                <row align="center">
+                  <hbox align="center" pack="end">
+                    <label value="&cookies.info.value.label;" control="cookieInfoValue"/>
+                  </hbox>
+                  <textbox id="cookieInfoValue" readonly="true" class="plain"/>
+                </row>
+
+                <row align="center">
+                  <hbox align="center" pack="end">
+                    <label id="cookieInfoHostLabel" value="&cookies.info.host.label;"
+                           value_host="&cookies.info.host.label;"
+                           value_domain="&cookies.info.domain.label;"
+                           control="cookieInfoHost"/>
+                  </hbox>
+                  <textbox id="cookieInfoHost" readonly="true" class="plain"/>
+                </row>
+
+                <row align="center">
+                  <hbox align="center" pack="end">
+                    <label value="&cookies.info.path.label;" control="cookieInfoPath"/>
+                  </hbox>
+                  <textbox id="cookieInfoPath" readonly="true" class="plain"/>
+                </row>
+
+                <row align="center">
+                  <hbox align="center" pack="end">
+                    <label value="&cookies.info.secure.label;" control="cookieInfoIsSecure"/>
+                  </hbox>
+                  <textbox id="cookieInfoIsSecure" readonly="true" class="plain"/>
+                </row>
+
+                <row align="center">
+                  <hbox align="center" pack="end">
+                    <label value="&cookies.info.expires.label;" control="cookieInfoExpires"/>
+                  </hbox>
+                  <textbox id="cookieInfoExpires" readonly="true" class="plain"/>
+                </row>
+
+              </rows>
+            </grid>
+          </groupbox>
+          <hbox>
+            <button id="cookieRemove" disabled="true"
+                    label="&cookies.button.remove.label;"
+                    accesskey="&cookies.button.remove.accesskey;"
+                    oncommand="gCookies.delete();"/>
+            <checkbox id="cookieBlockOnRemove"
+                      label="&cookies.blockOnRemove.label;"
+                      accesskey="&cookies.blockOnRemove.accesskey;"
+                      persist="checked"/>
+          </hbox>
         </vbox>
 
         <vbox id="permissionsPanel" flex="1">
