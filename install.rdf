@@ -6,7 +6,7 @@
     <em:id>@INSTALL_EXTENSION_ID@</em:id>
     <em:version>@EXTENSION_VERSION@</em:version>
     <em:name>Data Manager</em:name>
-    <em:description>Central access point to Cookies, Site Preferences, Permissions, Form Data</em:description>
+    <em:description>Central access point to Cookies, Content Preferences, Permissions, Passwords, Form Data</em:description>
     <em:creator>Robert Kaiser</em:creator>
     <!-- Firefox -->
     <em:targetApplication>
@@ -22,14 +22,6 @@
         <em:id>{92650c4d-4b8e-4d2a-b7eb-24ecf4f6b63a}</em:id>
         <em:minVersion>2.1a2pre</em:minVersion>
         <em:maxVersion>2.1a2</em:maxVersion>
-      </Description>
-    </em:targetApplication>
-    <!-- Fennec -->
-    <em:targetApplication>
-      <Description>
-        <em:id>{a23983c0-fd0e-11dc-95ff-0800200c9a66}</em:id>
-        <em:minVersion>0.1</em:minVersion>
-        <em:maxVersion>1.1a1</em:maxVersion>
       </Description>
     </em:targetApplication>
     <!-- toolkit -->

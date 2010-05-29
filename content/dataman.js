@@ -60,6 +60,9 @@ XPCOMUtils.defineLazyServiceGetter(gLocSvc, "date",
 XPCOMUtils.defineLazyServiceGetter(gLocSvc, "fhist",
                                    "@mozilla.org/satchel/form-history;1",
                                    "nsIFormHistory2");
+XPCOMUtils.defineLazyServiceGetter(gLocSvc, "url",
+                                   "@mozilla.org/network/url-parser;1?auth=maybe",
+                                   "nsIURLParser");
 
 var gDatamanBundle = null;
 
@@ -89,7 +92,7 @@ var gDomains = {
       let nextCookie = enumerator.getNext();
       if (!nextCookie) break;
       nextCookie = nextCookie.QueryInterface(Components.interfaces.nsICookie);
-      this._addDomainOrFlag(nextCookie.host.replace(/^\./, ""), "hasCookies", false);
+      this._addDomainOrFlag(nextCookie.host.replace(/^\./, ""), "hasCookies");
     }
 
     // add domains for permissions
@@ -97,19 +100,19 @@ var gDomains = {
     while (enumerator.hasMoreElements()) {
       let nextPermission = enumerator.getNext();
       nextPermission = nextPermission.QueryInterface(Components.interfaces.nsIPermission);
-      this._addDomainOrFlag(nextPermission.host.replace(/^\./, ""), "hasPermissions", false);
+      this._addDomainOrFlag(nextPermission.host.replace(/^\./, ""), "hasPermissions");
     }
     // add domains for password rejects to permissions
     let rejectHosts = gLocSvc.pwd.getAllDisabledHosts();
     for (let i = 0; i < rejectHosts.length; i++) {
-      this._addDomainOrFlag(rejectHosts[i], "hasPermissions", true);
+      this._addDomainOrFlag(rejectHosts[i], "hasPermissions");
     }
 
     // add domains for content prefs
     try {
       var statement = gLocSvc.cpref.DBConnection.createStatement("SELECT groups.name AS host FROM groups");
       while (statement.executeStep()) {
-        this._addDomainOrFlag(statement.row["host"], "hasPreferences", false);
+        this._addDomainOrFlag(statement.row["host"], "hasPreferences");
       }
     }
     finally {
@@ -119,53 +122,44 @@ var gDomains = {
     // add domains for passwords
     let signons = gLocSvc.pwd.getAllLogins();
     for (let i = 0; i < signons.length; i++) {
-      this._addDomainOrFlag(signons[i].hostname, "hasPasswords", true);
+      this._addDomainOrFlag(signons[i].hostname, "hasPasswords");
     }
 
     this.search("");
   },
 
-  getDomainFromHost: function(aHostname, aHostIsURI) {
+  getDomainFromHost: function(aHostname) {
     // find the base domain name for the given host name
+
+    // return vars for nsIURLParser must all be objects
+    // see bug 568997 for improvements to that interface
+    var schemePos = {}, schemeLen = {}, authPos = {}, authLen = {}, pathPos = {},
+        pathLen = {}, usernamePos = {}, usernameLen = {}, passwordPos = {},
+        passwordLen = {}, hostnamePos = {}, hostnameLen = {}, port = {};
+    gLocSvc.url.parseURL(aHostname, -1, schemePos, schemeLen, authPos, authLen,
+                         pathPos, pathLen);
+    var auth = aHostname.substring(authPos.value, authPos.value + authLen.value);
+    gLocSvc.url.parseAuthority(auth, authLen.value, usernamePos, usernameLen,
+                               passwordPos, passwordLen, hostnamePos, hostnameLen, port);
+    var hostName = auth.substring(hostnamePos.value, hostnamePos.value + hostnameLen.value);
+
     var domain;
-    if (aHostIsURI) {
-      try {
-        let hostURI = Services.io.newURI(aHostname, null, null);
-        try {
-          domain = gLocSvc.eTLD.getBaseDomain(hostURI);
-        }
-        catch (e) {
-          domain = hostURI.host;
-        }
-      }
-      catch (e) {
-        Components.utils.reportError(e + "\nOffending Non-URI Hostname is: " + aHostname);
-        try {
-          domain = gLocSvc.eTLD.getBaseDomainFromHost(aHostname);
-        }
-        catch (e) {
-          domain = aHostname;
-        }
-      }
+    try {
+      domain = gLocSvc.eTLD.getBaseDomainFromHost(hostName);
     }
-    else {
-      try {
-        domain = gLocSvc.eTLD.getBaseDomainFromHost(aHostname);
-      }
-      catch (e) {
-        domain = aHostname;
-      }
+    catch (e) {
+      domain = hostName;
     }
     return domain;
   },
 
-  hostMatchesSelected: function(aHostname, aHostIsURI) {
-    return this.getDomainFromHost(aHostname, aHostIsURI) == this.selectedDomainName;
+  hostMatchesSelected: function(aHostname) {
+    return this.getDomainFromHost(aHostname) == this.selectedDomainName;
   },
 
-  _addDomainOrFlag: function(aHostname, aFlag, aHostIsURI) {
+  _addDomainOrFlag: function(aHostname, aFlag) {
     // for existing domains, add flags, for others, add them to the object
-    let domain = this.getDomainFromHost(aHostname, aHostIsURI);
+    let domain = this.getDomainFromHost(aHostname);
     if (!this.domainObjects.some(
           function(aElement, aIndex, aArray) {
             if (aElement.title == domain)
@@ -333,7 +327,7 @@ var gCookies = {
       if (!nextCookie) break;
       nextCookie = nextCookie.QueryInterface(Components.interfaces.nsICookie);
       let host = nextCookie.host;
-      if (gDomains.hostMatchesSelected(host.replace(/^\./, ""), false))
+      if (gDomains.hostMatchesSelected(host.replace(/^\./, "")))
         this.cookies.push({name: nextCookie.name,
                            value: nextCookie.value,
                            isDomain: nextCookie.isDomain,
@@ -434,7 +428,7 @@ var gPerms = {
       let nextPermission = enumerator.getNext();
       nextPermission = nextPermission.QueryInterface(Components.interfaces.nsIPermission);
       let host = nextPermission.host;
-      if (gDomains.hostMatchesSelected(host.replace(/^\./, ""), false)) {
+      if (gDomains.hostMatchesSelected(host.replace(/^\./, ""))) {
         let permElem = document.createElement("richlistitem");
         permElem.setAttribute("type", nextPermission.type);
         permElem.setAttribute("host", nextPermission.host);
@@ -448,11 +442,11 @@ var gPerms = {
     // visually treat password rejects like permissions
     let rejectHosts = gLocSvc.pwd.getAllDisabledHosts();
     for (let i = 0; i < rejectHosts.length; i++) {
-      if (gDomains.hostMatchesSelected(rejectHosts[i], true)) {
+      if (gDomains.hostMatchesSelected(rejectHosts[i])) {
         let permElem = document.createElement("richlistitem");
         permElem.setAttribute("type", "password");
         permElem.setAttribute("host", rejectHosts[i]);
-        permElem.setAttribute("rawHost", gDomains.getDomainFromHost(rejectHosts[i], true));
+        permElem.setAttribute("rawHost", gDomains.getDomainFromHost(rejectHosts[i]));
         permElem.setAttribute("capability", 2);
         permElem.setAttribute("class", "permission");
         permElem.setAttribute("orient", "vertical");
@@ -489,7 +483,7 @@ var gPasswords = {
     this.tree.treeBoxObject.beginUpdateBatch();
     let allSignons = gLocSvc.pwd.getAllLogins();
     for (let i = 0; i < allSignons.length; i++) {
-      if (gDomains.hostMatchesSelected(allSignons[i].hostname, true))
+      if (gDomains.hostMatchesSelected(allSignons[i].hostname))
       this.signons.push(allSignons[i]);
     }
     this.tree.treeBoxObject.endUpdateBatch();
