@@ -63,6 +63,9 @@ XPCOMUtils.defineLazyServiceGetter(gLocSvc, "fhist",
 XPCOMUtils.defineLazyServiceGetter(gLocSvc, "url",
                                    "@mozilla.org/network/url-parser;1?auth=maybe",
                                    "nsIURLParser");
+XPCOMUtils.defineLazyServiceGetter(gLocSvc, "clipboard",
+                                   "@mozilla.org/widget/clipboardhelper;1",
+                                   "nsIClipboardHelper");
 
 var gDatamanBundle = null;
 
@@ -120,9 +123,9 @@ var gDomains = {
     }
 
     // add domains for passwords
-    let signons = gLocSvc.pwd.getAllLogins();
-    for (let i = 0; i < signons.length; i++) {
-      this._addDomainOrFlag(signons[i].hostname, "hasPasswords");
+    gPasswords.allSignons = gLocSvc.pwd.getAllLogins();
+    for (let i = 0; i < gPasswords.allSignons.length; i++) {
+      this._addDomainOrFlag(gPasswords.allSignons[i].hostname, "hasPasswords");
     }
 
     this.search("");
@@ -420,6 +423,10 @@ var gCookies = {
     return true;
   },
 
+  selectAll: function cookies_selectAll() {
+    this.tree.view.selection.selectAll();
+  },
+
   _clearCookieInfo: function cookies__clearCookieInfo() {
     var fields = ["cookieInfoName", "cookieInfoValue", "cookieInfoHost",
                   "cookieInfoPath", "cookieInfoIsSecure", "cookieInfoExpires"];
@@ -436,7 +443,7 @@ var gCookies = {
     else if (aEvent.ctrlKey &&
              String.fromCharCode(aEvent.charCode).toLocaleLowerCase() ==
                this.tree.getAttribute("selectAllKey").charAt(0).toLocaleLowerCase()) {
-      this.tree.view.selection.selectAll();
+      this.selectAll();
     }
   },
 
@@ -576,16 +583,20 @@ var gPerms = {
 
 var gPasswords = {
   tree: null,
+  removeButton: null,
   toggleButton: null,
   pwdCol: null,
 
-  showPasswords: false,
-  signons: [],
+  allSignons: null,
 
-  initialize: function() {
+  showPasswords: false,
+  displayedSignons: [],
+
+  initialize: function passwords_initialize() {
     this.tree = document.getElementById("passwordsTree");
     this.tree.view = passwordTreeView;
 
+    this.removeButton = document.getElementById("pwdRemove");
     this.toggleButton = document.getElementById("pwdToggle");
     this.toggleButton.label = gDatamanBundle.getString("pwd.showPasswords");
     this.toggleButton.accessKey = gDatamanBundle.getString("pwd.showPasswords.accesskey");
@@ -593,65 +604,101 @@ var gPasswords = {
     this.pwdCol = document.getElementById("pwdPasswordCol");
 
     this.tree.treeBoxObject.beginUpdateBatch();
-    let allSignons = gLocSvc.pwd.getAllLogins();
-    for (let i = 0; i < allSignons.length; i++) {
-      if (gDomains.hostMatchesSelected(allSignons[i].hostname))
-      this.signons.push(allSignons[i]);
+    if (!this.allSignons)
+      this.allSignons = gLocSvc.pwd.getAllLogins();
+    for (let i = 0; i < this.allSignons.length; i++) {
+      if (this.allSignons[i] && gDomains.hostMatchesSelected(this.allSignons[i].hostname))
+        this.displayedSignons.push(i);
     }
     this.tree.treeBoxObject.endUpdateBatch();
     this.tree.treeBoxObject.invalidate();
   },
 
-  shutdown: function() {
+  shutdown: function passwords_shutdown() {
     if (this.showPasswords)
       this.togglePasswordVisible();
     this.tree.view.selection.clearSelection();
     this.tree.view = null;
-    this.signons = [];
+    this.displayedSignons = [];
   },
 
-  select: function() {
-    Services.console.logStringMessage("Selected: " + this.tree.currentIndex);
+  select: function passwords_select() {
+    var selections = gDatamanUtils.getTreeSelections(this.tree);
+    this.removeButton.disabled = !selections.length;
+    return true;
   },
 
-  handleKeyPress: function(aEvent) {
+  selectAll: function passwords_selectAll() {
+    this.tree.view.selection.selectAll();
+  },
+
+  handleKeyPress: function passwords_handleKeyPress(aEvent) {
     if (aEvent.keyCode == KeyEvent.DOM_VK_DELETE) {
       this.delete();
     }
   },
 
-  sort: function(aColumn, aUpdateSelection) {
+  sort: function passwords_sort(aColumn, aUpdateSelection) {
     Services.console.logStringMessage("Sort: " + aColumn);
   },
 
-  delete: function() {
-    Services.console.logStringMessage("Password delete requested");
+  delete: function passwords_delete() {
+    var selections = gDatamanUtils.getTreeSelections(this.tree);
+
+    if (selections.length > 1) {
+      let title = gDatamanBundle.getString("pwd.deleteSelectedTitle");
+      let msg = gDatamanBundle.getString("pwd.deleteSelected");
+      let flags = ((Services.prompt.BUTTON_TITLE_IS_STRING * Services.prompt.BUTTON_POS_0) +
+                   (Services.prompt.BUTTON_TITLE_CANCEL * Services.prompt.BUTTON_POS_1) +
+                   Services.prompt.BUTTON_POS_1_DEFAULT)
+      let yes = gDatamanBundle.getString("pwd.deleteSelectedYes");
+      if (Services.prompt.confirmEx(window, title, msg, flags, yes, null, null,
+                                    null, {value: 0}) == 1) // 1=="Cancel" button
+        return;
+    }
+
+    this.tree.view.selection.clearSelection();
+    // Loop backwards so later indexes in the list don't change.
+    for (let i = selections.length - 1; i >= 0; i--) {
+      let delSignon = this.allSignons[this.displayedSignons[i]];
+      this.allSignons[this.displayedSignons[i]] = null;
+      this.displayedSignons.splice(i, 1);
+      this.tree.treeBoxObject.rowCountChanged(i, -1);
+      gLocSvc.pwd.removeLogin(delSignon);
+    }
   },
 
-  togglePasswordVisible: function() {
+  togglePasswordVisible: function passwords_togglePasswordVisible() {
     if (this.showPasswords || this._confirmShowPasswords()) {
       this.showPasswords = !this.showPasswords;
-      this.toggleButton.label = gDatamanBundle.getString(this.showPasswords ? "pwd.hidePasswords" : "pwd.showPasswords");
-      this.toggleButton.accessKey = gDatamanBundle.getString(this.showPasswords ? "pwd.hidePasswords.accesskey" : "pwd.showPasswords.accesskey");
+      this.toggleButton.label = gDatamanBundle.getString(this.showPasswords ?
+                                                         "pwd.hidePasswords" :
+                                                         "pwd.showPasswords");
+      this.toggleButton.accessKey = gDatamanBundle.getString(this.showPasswords ?
+                                                             "pwd.hidePasswords.accesskey" :
+                                                             "pwd.showPasswords.accesskey");
       this.pwdCol.hidden = !this.showPasswords;
     }
   },
 
-  _confirmShowPasswords: function() {
+  _confirmShowPasswords: function passwords__confirmShowPasswords() {
     // This doesn't harm if passwords are not encrypted
     let tokendb = Components.classes["@mozilla.org/security/pk11tokendb;1"]
                             .createInstance(Components.interfaces.nsIPK11TokenDB);
     let token = tokendb.getInternalKeyToken();
 
-    // If there is no master password, still give the user a chance to opt-out of displaying passwords
+    // If there is no master password, still give the user a chance to opt-out
+    // of displaying passwords
     if (token.checkPassword(""))
       return this._askUserShowPasswords();
 
-    // So there's a master password. But since checkPassword didn't succeed, we're logged out (per nsIPK11Token.idl).
+    // So there's a master password. But since checkPassword didn't succeed,
+    // we're logged out (per nsIPK11Token.idl).
     try {
       // Relogin and ask for the master password.
-      token.login(true);  // 'true' means always prompt for token password. User will be prompted until
-                          // clicking 'Cancel' or entering the correct password.
+      token.login(true);  // 'true' means always prompt for token password. User
+                          // will be prompted until clicking 'Cancel' or
+                          // entering the correct password.
     } catch (e) {
       // An exception will be thrown if the user cancels the login prompt dialog.
       // User is also logged out of Software Security Device.
@@ -660,7 +707,7 @@ var gPasswords = {
     return token.isLoggedIn();
   },
 
-  _askUserShowPasswords: function() {
+  _askUserShowPasswords: function passwords__askUserShowPasswords() {
     // Confirm the user wants to display passwords
     return Services.prompt.confirmEx(window,
                                      null,
@@ -669,25 +716,33 @@ var gPasswords = {
                                      null, null, null, null, { value: false }) == 0; // 0=="Yes" button
   },
 
-  updateContext: function() {
-    Services.console.logStringMessage("Should update context menu");
+  updateContext: function passwords_updateContext() {
+    document.getElementById("pwd-context-remove").disabled =
+      this.removeButton.disabled;
+    document.getElementById("pwd-context-copypassword").disabled =
+      (this.tree.view.selection.count != 1);
+    document.getElementById("pwd-context-selectall").disabled =
+      (this.tree.view.selection.count >= this.tree.view.rowCount);
   },
 
-  copyPassword: function() {
-    Services.console.logStringMessage("Should copy password");
+  copyPassword: function passwords_copyPassword() {
+    // Copy selected signon's password to clipboard
+    let row = this.tree.currentIndex;
+    let password = gPasswords.allSignons[gPasswords.displayedSignons[row]].password;
+    gLocSvc.clipboard.copyString(password);
   },
 };
 
 var passwordTreeView = {
   get rowCount() {
-    return gPasswords.signons.length;
+    return gPasswords.displayedSignons.length;
   },
   setTree: function(aTree) {},
   getImageSrc: function(aRow, aColumn) {},
   getProgressMode: function(aRow, aColumn) {},
   getCellValue: function(aRow, aColumn) {},
   getCellText: function(aRow, aColumn) {
-    let signon = gPasswords.signons[aRow];
+    let signon = gPasswords.allSignons[gPasswords.displayedSignons[aRow]];
     switch (aColumn.id) {
       case "pwdHostCol":
         return signon.httpRealm ?

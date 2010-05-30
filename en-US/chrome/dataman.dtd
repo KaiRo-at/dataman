@@ -99,6 +99,11 @@
 <!ENTITY pwd.remove.accesskey "R">
 <!ENTITY pwd.copyPasswordCmd.label "Copy Password">
 <!ENTITY pwd.copyPasswordCmd.accesskey "C">
+<!ENTITY pwd.selectAll.label "Select All">
+<!ENTITY pwd.selectAll.accesskey "A">
+
+<!ENTITY pwd.button.remove.label "Remove">
+<!ENTITY pwd.button.remove.accesskey "R">
 
 <!-- form data -->
 <!ENTITY formdata.description "Form data is being remembered for any text field in any web form and is proposed automatically for fields with the same name on any websites you encounter.">

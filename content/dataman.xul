@@ -68,6 +68,10 @@
                 label="&pwd.copyPasswordCmd.label;"
                 accesskey="&pwd.copyPasswordCmd.accesskey;"
                 oncommand="gPasswords.copyPassword()"/>
+      <menuitem id="pwd-context-selectall"
+                label="&pwd.selectAll.label;"
+                accesskey="&pwd.selectAll.accesskey;"
+                oncommand="gPasswords.selectAll()"/>
     </popup>
   </popupset>
 
@@ -236,6 +240,10 @@
             <treechildren/>
           </tree>
           <hbox id="passwordButtons">
+            <button id="pwdRemove" disabled="true"
+                    label="&pwd.button.remove.label;"
+                    accesskey="&pwd.button.remove.accesskey;"
+                    oncommand="gPasswords.delete();"/>
             <spacer flex="1"/>
             <button id="pwdToggle"
                     oncommand="gPasswords.togglePasswordVisible();"/>
