@@ -71,8 +71,8 @@ var gDatamanBundle = null;
 
 function initialize() {
   gDatamanBundle = document.getElementById("datamanBundle");
-  gDomains.initialize();
   gTabs.initialize();
+  gDomains.initialize();
 }
 
 var gDomains = {
@@ -129,6 +129,8 @@ var gDomains = {
     }
 
     this.search("");
+    this.tree.view.selection.select(0);
+    gTabs.formdataTab.focus();
   },
 
   getDomainFromHost: function domain_getDomainFromHost(aHostname) {
