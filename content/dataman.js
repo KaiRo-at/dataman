@@ -82,7 +82,7 @@ var gDomains = {
   domainObjects: [],
   displayedDomains: [],
 
-  initialize: function() {
+  initialize: function domain_initialize() {
     this.tree = document.getElementById("domainTree");
     this.tree.view = domainTreeView;
 
@@ -131,7 +131,7 @@ var gDomains = {
     this.search("");
   },
 
-  getDomainFromHost: function(aHostname) {
+  getDomainFromHost: function domain_getDomainFromHost(aHostname) {
     // find the base domain name for the given host name
 
     // return vars for nsIURLParser must all be objects
@@ -156,11 +156,11 @@ var gDomains = {
     return domain;
   },
 
-  hostMatchesSelected: function(aHostname) {
+  hostMatchesSelected: function domain_hostMatchesSelected(aHostname) {
     return this.getDomainFromHost(aHostname) == this.selectedDomainName;
   },
 
-  _addDomainOrFlag: function(aHostname, aFlag) {
+  _addDomainOrFlag: function domain__addDomainOrFlag(aHostname, aFlag) {
     // for existing domains, add flags, for others, add them to the object
     let domain = this.getDomainFromHost(aHostname);
     if (!this.domainObjects.some(
@@ -175,7 +175,7 @@ var gDomains = {
     }
   },
 
-  select: function() {
+  select: function domain_select() {
     if (this.tree.view.selection.count != 1) {
       Components.utils.reportError("Data Manager doesn't support anything but one selected domain");
       this.tree.view.selection.clearSelection();
@@ -199,22 +199,28 @@ var gDomains = {
     return this.domainObjects[gDomains.displayedDomains[this.tree.currentIndex]].title;
   },
 
-  search: function(aSearchString) {
+  sort: function domain_sort() {
+    // Compare function for two domain items
+    let compfunc = function domain_sort_compare(aOne, aTwo) {
+      return (gDomains.domainObjects[aOne].title
+              .localeCompare(gDomains.domainObjects[aTwo].title));
+    };
+
+    // Do the actual sorting of the array
+    this.displayedDomains.sort(compfunc);
+    this.tree.treeBoxObject.invalidate();
+  },
+
+  search: function domain_search(aSearchString) {
     this.tree.treeBoxObject.beginUpdateBatch();
     this.displayedDomains = [];
     for (let i = 0; i < this.domainObjects.length; i++) {
       if (this.domainObjects[i].title.toLocaleLowerCase().indexOf(aSearchString) != -1)
         this.displayedDomains.push(i);
     }
-    this.displayedDomains.sort(this._sortCompare);
     this.tree.treeBoxObject.endUpdateBatch();
-    this.tree.treeBoxObject.invalidate();
+    this.sort();
   },
-
-  _sortCompare: function domain__sortCompare(aOne, aTwo) {
-    return (gDomains.domainObjects[aOne].title
-            .localeCompare(gDomains.domainObjects[aTwo].title));
-  }
 };
 
 var domainTreeView = {
@@ -920,9 +926,74 @@ var gFormdata = {
     }
   },
 
-  sort: function formdata_sort(aColumn, aUpdateSelection) {
-    Services.console.logStringMessage("Sort: " + aColumn);
-    //this.displayedFormdata.sort(this._sortCompare);
+  sort: function formdata_sort(aColumn, aUpdateSelection, aInvertDirection) {
+    // make sure we have a valid column
+    let column = aColumn;
+    if (!column) {
+      let sortedCol = this.tree.columns.getSortedColumn();
+      if (sortedCol)
+        column = sortedCol.element;
+      else
+        column = document.getElementById("fdataFieldCol");
+    }
+    else if (column.localName == "treecols" || column.localName == "splitter")
+      return;
+
+    if (!column || column.localName != "treecol") {
+      Components.utils.reportError("No column found to sort form data by");
+      return;
+    }
+
+    let dirAscending = column.getAttribute("sortDirection") !=
+                       (aInvertDirection ? "ascending" : "descending");
+    let dirFactor = dirAscending ? 1 : -1;
+
+    // Clear attributes on all columns, we're setting them again after sorting
+    for (let node = column.parentNode.firstChild; node; node = node.nextSibling) {
+      node.removeAttribute("sortActive");
+      node.removeAttribute("sortDirection");
+    }
+
+    // Compare function for two formdata items
+    let compfunc = function formdata_sort_compare(aOne, aTwo) {
+      switch (column.id) {
+        case "fdataFieldCol":
+          return dirFactor * gFormdata.formdata[aOne].fieldname
+                             .localeCompare(gFormdata.formdata[aTwo].fieldname);
+        case "fdataValueCol":
+          return dirFactor * gFormdata.formdata[aOne].value
+                             .localeCompare(gFormdata.formdata[aTwo].value);
+        case "fdataCountCol":
+          return dirFactor * (gFormdata.formdata[aOne].timesUsed -
+                              gFormdata.formdata[aTwo].timesUsed);
+        case "fdataFirstCol":
+          return dirFactor * (gFormdata.formdata[aOne].firstUsedSortValue -
+                              gFormdata.formdata[aTwo].firstUsedSortValue);
+        case "fdataLastCol":
+          return dirFactor * (gFormdata.formdata[aOne].lastUsedSortValue -
+                              gFormdata.formdata[aTwo].lastUsedSortValue);
+      }
+      return 0;
+    };
+
+    if (aUpdateSelection) {
+      // Cache the current selection
+      //this._cacheSelection();
+    }
+    this.tree.view.selection.clearSelection();
+
+    // Do the actual sorting of the array
+    this.displayedFormdata.sort(compfunc);
+    this.tree.treeBoxObject.invalidate();
+
+    if (aUpdateSelection) {
+      // Restore the previous selection
+      //this._restoreSelection();
+    }
+
+    // Set attributes to the sorting we did
+    column.setAttribute("sortActive", "true");
+    column.setAttribute("sortDirection", dirAscending ? "ascending" : "descending");
   },
 
   delete: function formdata_delete() {
@@ -938,9 +1009,8 @@ var gFormdata = {
           this.formdata[i].value.toLocaleLowerCase().indexOf(aSearchString) != -1)
         this.displayedFormdata.push(i);
     }
-    //this.sort(null, false);
     this.tree.treeBoxObject.endUpdateBatch();
-    this.tree.treeBoxObject.invalidate();
+    this.sort(null, false, false);
   },
 };
 

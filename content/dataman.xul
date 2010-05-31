@@ -261,22 +261,26 @@
           <tree id="formdataTree" flex="1"
                     onkeypress="gFormdata.handleKeyPress(event)"
                     onselect="gFormdata.select();">
-            <treecols>
-              <treecol id="fdataFieldCol" label="&fdatatree.fieldname.label;" flex="5"
-                       onclick="gFormdata.sort('fieldname', true);" persist="width hidden"
-                       sortDirection="ascending"/>
+            <treecols onclick="gFormdata.sort(event.target, true, true)">
+              <treecol id="fdataFieldCol" flex="5"
+                       label="&fdatatree.fieldname.label;"
+                       persist="width hidden"/>
               <splitter class="tree-splitter"/>
-              <treecol id="fdataValueCol" label="&fdatatree.value.label;" flex="10"
-                       onclick="gFormdata.sort('value', true);" persist="width hidden"/>
+              <treecol id="fdataValueCol" flex="10"
+                       label="&fdatatree.value.label;"
+                       persist="width hidden"/>
               <splitter class="tree-splitter"/>
-              <treecol id="fdataCountCol" label="&fdatatree.usecount.label;" flex="2"
-                       hidden="true" onclick="gFormdata.sort('timeUsed', true);" persist="width hidden"/>
+              <treecol id="fdataCountCol" flex="2"
+                       label="&fdatatree.usecount.label;"
+                       hidden="true" persist="width hidden"/>
               <splitter class="tree-splitter"/>
-              <treecol id="fdataFirstCol" label="&fdatatree.firstused.label;" flex="10"
-                       hidden="true" onclick="gFormdata.sort('firstUsed', true);" persist="width hidden"/>
+              <treecol id="fdataFirstCol" flex="10"
+                       label="&fdatatree.firstused.label;"
+                       hidden="true" persist="width hidden"/>
               <splitter class="tree-splitter"/>
-              <treecol id="fdataLastCol" label="&fdatatree.lastused.label;" flex="10"
-                       hidden="true" onclick="gFormdata.sort('lastUsed', true);" persist="width hidden"/>
+              <treecol id="fdataLastCol" flex="10"
+                       label="&fdatatree.lastused.label;"
+                       hidden="true" persist="width hidden"/>
             </treecols>
             <treechildren/>
           </tree>
