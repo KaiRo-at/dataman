@@ -203,7 +203,7 @@ var gDomains = {
     this.tree.treeBoxObject.beginUpdateBatch();
     this.displayedDomains = [];
     for (let i = 0; i < this.domainObjects.length; i++) {
-      if (this.domainObjects[i].title.indexOf(aSearchString) != -1)
+      if (this.domainObjects[i].title.toLocaleLowerCase().indexOf(aSearchString) != -1)
         this.displayedDomains.push(i);
     }
     this.displayedDomains.sort(this._sortCompare);
@@ -853,41 +853,42 @@ var gFormdata = {
   tree: null,
 
   formdata: [],
+  displayedFormdata: [],
 
-  initialize: function() {
+  initialize: function formdata_initialize() {
     this.tree = document.getElementById("formdataTree");
     this.tree.view = formdataTreeView;
 
-    this.tree.treeBoxObject.beginUpdateBatch();
-    try {
-      let sql = "SELECT fieldname, value, timesUsed, firstUsed, lastUsed, guid FROM moz_formhistory";
-      var statement = gLocSvc.fhist.DBConnection.createStatement(sql);
-      while (statement.executeStep()) {
-        this.formdata.push({fieldname: statement.row["fieldname"],
-                            value: statement.row["value"],
-                            timesUsed: statement.row["timesUsed"],
-                            firstUsed: this._getTimeString(statement.row["firstUsed"]),
-                            firstUsedSortValue: statement.row["firstUsed"],
-                            lastUsed: this._getTimeString(statement.row["lastUsed"]),
-                            lastUsedSortValue: statement.row["lastUsed"],
-                            guid: statement.row["guid"]}
-                         );
+    if (!this.formdata.length) {
+      try {
+        let sql = "SELECT fieldname, value, timesUsed, firstUsed, lastUsed, guid FROM moz_formhistory";
+        var statement = gLocSvc.fhist.DBConnection.createStatement(sql);
+        while (statement.executeStep()) {
+          this.formdata.push({fieldname: statement.row["fieldname"],
+                              value: statement.row["value"],
+                              timesUsed: statement.row["timesUsed"],
+                              firstUsed: this._getTimeString(statement.row["firstUsed"]),
+                              firstUsedSortValue: statement.row["firstUsed"],
+                              lastUsed: this._getTimeString(statement.row["lastUsed"]),
+                              lastUsedSortValue: statement.row["lastUsed"],
+                              guid: statement.row["guid"]}
+                          );
+        }
+      }
+      finally {
+        statement.reset();
       }
     }
-    finally {
-      statement.reset();
-    }
-    this.tree.treeBoxObject.endUpdateBatch();
-    this.tree.treeBoxObject.invalidate();
+    this.search("");
   },
 
-  shutdown: function() {
+  shutdown: function formdata_shutdown() {
     this.tree.view.selection.clearSelection();
     this.tree.view = null;
-    this.formdata = [];
+    this.displayedFormdata = [];
   },
 
-  _getTimeString: function formdata_getTimeString(aTimestamp) {
+  _getTimeString: function formdata__getTimeString(aTimestamp) {
     if (aTimestamp) {
       let date = new Date(aTimestamp / 1000);
 
@@ -909,28 +910,43 @@ var gFormdata = {
     return "";
   },
 
-  select: function() {
+  select: function formdata_select() {
     Services.console.logStringMessage("Selected: " + this.tree.currentIndex);
   },
 
-  handleKeyPress: function(aEvent) {
+  handleKeyPress: function formdata_handleKeyPress(aEvent) {
     if (aEvent.keyCode == KeyEvent.DOM_VK_DELETE) {
       this.delete();
     }
   },
 
-  sort: function(aColumn, aUpdateSelection) {
+  sort: function formdata_sort(aColumn, aUpdateSelection) {
     Services.console.logStringMessage("Sort: " + aColumn);
+    //this.displayedFormdata.sort(this._sortCompare);
   },
 
-  delete: function() {
+  delete: function formdata_delete() {
     Services.console.logStringMessage("Form data entry delete requested");
+  },
+
+  search: function formdata_search(aSearchString) {
+    this.tree.view.selection.clearSelection();
+    this.tree.treeBoxObject.beginUpdateBatch();
+    this.displayedFormdata = [];
+    for (let i = 0; i < this.formdata.length; i++) {
+      if (this.formdata[i].fieldname.toLocaleLowerCase().indexOf(aSearchString) != -1 ||
+          this.formdata[i].value.toLocaleLowerCase().indexOf(aSearchString) != -1)
+        this.displayedFormdata.push(i);
+    }
+    //this.sort(null, false);
+    this.tree.treeBoxObject.endUpdateBatch();
+    this.tree.treeBoxObject.invalidate();
   },
 };
 
 var formdataTreeView = {
   get rowCount() {
-    return gFormdata.formdata.length;
+    return gFormdata.displayedFormdata.length;
   },
   setTree: function(aTree) {},
   getImageSrc: function(aRow, aColumn) {},
@@ -939,15 +955,15 @@ var formdataTreeView = {
   getCellText: function(aRow, aColumn) {
     switch (aColumn.id) {
       case "fdataFieldCol":
-        return gFormdata.formdata[aRow].fieldname;
+        return gFormdata.formdata[gFormdata.displayedFormdata[aRow]].fieldname;
       case "fdataValueCol":
-        return gFormdata.formdata[aRow].value;
+        return gFormdata.formdata[gFormdata.displayedFormdata[aRow]].value;
       case "fdataCountCol":
-        return gFormdata.formdata[aRow].timesUsed;
+        return gFormdata.formdata[gFormdata.displayedFormdata[aRow]].timesUsed;
       case "fdataFirstCol":
-        return gFormdata.formdata[aRow].firstUsed;
+        return gFormdata.formdata[gFormdata.displayedFormdata[aRow]].firstUsed;
       case "fdataLastCol":
-        return gFormdata.formdata[aRow].lastUsed;
+        return gFormdata.formdata[gFormdata.displayedFormdata[aRow]].lastUsed;
     }
   },
   isSeparator: function(aIndex) { return false; },

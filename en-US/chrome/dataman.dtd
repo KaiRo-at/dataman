@@ -108,6 +108,8 @@
 <!-- form data -->
 <!ENTITY formdata.description "Form data is being remembered for any text field in any web form and is proposed automatically for fields with the same name on any websites you encounter.">
 
+<!ENTITY fdata.search.placeholder "Search Field Data">
+
 <!ENTITY fdatatree.fieldname.label "Field Name">
 <!ENTITY fdatatree.value.label "Entered Value">
 <!ENTITY fdatatree.usecount.label "Use Count">

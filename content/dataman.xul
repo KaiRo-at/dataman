@@ -77,7 +77,7 @@
 
   <hbox flex="1">
     <vbox flex="1">
-      <textbox id="search-box"
+      <textbox id="domainSearch"
                clickSelectsAll="true"
                type="search"
                class="compact"
@@ -252,6 +252,12 @@
 
         <vbox id="formdataPanel" flex="1">
           <description value="&formdata.description;"/>
+          <textbox id="formdataSearch"
+                   clickSelectsAll="true"
+                   type="search"
+                   class="compact"
+                   placeholder="&fdata.search.placeholder;"
+                   oncommand="gFormdata.search(this.value);"/>
           <tree id="formdataTree" flex="1"
                     onkeypress="gFormdata.handleKeyPress(event)"
                     onselect="gFormdata.select();">
