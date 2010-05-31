@@ -215,7 +215,8 @@ var gDomains = {
     this.tree.treeBoxObject.beginUpdateBatch();
     this.displayedDomains = [];
     for (let i = 0; i < this.domainObjects.length; i++) {
-      if (this.domainObjects[i].title.toLocaleLowerCase().indexOf(aSearchString) != -1)
+      if (this.domainObjects[i] &&
+          this.domainObjects[i].title.toLocaleLowerCase().indexOf(aSearchString) != -1)
         this.displayedDomains.push(i);
     }
     this.tree.treeBoxObject.endUpdateBatch();
@@ -476,8 +477,8 @@ var gCookies = {
     // Loop backwards so later indexes in the list don't change.
     for (let i = selections.length - 1; i >= 0; i--) {
       let delCookie = this.cookies[selections[i]];
-      this.cookies.splice(i, 1);
-      this.tree.treeBoxObject.rowCountChanged(i, -1);
+      this.cookies.splice(selections[i], 1);
+      this.tree.treeBoxObject.rowCountChanged(selections[i], -1);
       gLocSvc.cookie.remove(delCookie.host, delCookie.name, delCookie.path,
                             this.blockOnRemove.checked);
     }
@@ -666,10 +667,10 @@ var gPasswords = {
     this.tree.view.selection.clearSelection();
     // Loop backwards so later indexes in the list don't change.
     for (let i = selections.length - 1; i >= 0; i--) {
-      let delSignon = this.allSignons[this.displayedSignons[i]];
-      this.allSignons[this.displayedSignons[i]] = null;
-      this.displayedSignons.splice(i, 1);
-      this.tree.treeBoxObject.rowCountChanged(i, -1);
+      let delSignon = this.allSignons[this.displayedSignons[selections[i]]];
+      this.allSignons[this.displayedSignons[selections[i]]] = null;
+      this.displayedSignons.splice(selections[i], 1);
+      this.tree.treeBoxObject.rowCountChanged(selections[i], -1);
       gLocSvc.pwd.removeLogin(delSignon);
     }
   },
@@ -857,6 +858,7 @@ var prefsTreeView = {
 
 var gFormdata = {
   tree: null,
+  removeButton: null,
 
   formdata: [],
   displayedFormdata: [],
@@ -864,6 +866,8 @@ var gFormdata = {
   initialize: function formdata_initialize() {
     this.tree = document.getElementById("formdataTree");
     this.tree.view = formdataTreeView;
+
+    this.removeButton = document.getElementById("fdataRemove");
 
     if (!this.formdata.length) {
       try {
@@ -917,7 +921,9 @@ var gFormdata = {
   },
 
   select: function formdata_select() {
-    Services.console.logStringMessage("Selected: " + this.tree.currentIndex);
+    var selections = gDatamanUtils.getTreeSelections(this.tree);
+    this.removeButton.disabled = !selections.length;
+    return true;
   },
 
   handleKeyPress: function formdata_handleKeyPress(aEvent) {
@@ -997,7 +1003,29 @@ var gFormdata = {
   },
 
   delete: function formdata_delete() {
-    Services.console.logStringMessage("Form data entry delete requested");
+    var selections = gDatamanUtils.getTreeSelections(this.tree);
+
+    if (selections.length > 1) {
+      let title = gDatamanBundle.getString("fdata.deleteSelectedTitle");
+      let msg = gDatamanBundle.getString("fdata.deleteSelected");
+      let flags = ((Services.prompt.BUTTON_TITLE_IS_STRING * Services.prompt.BUTTON_POS_0) +
+                   (Services.prompt.BUTTON_TITLE_CANCEL * Services.prompt.BUTTON_POS_1) +
+                   Services.prompt.BUTTON_POS_1_DEFAULT)
+      let yes = gDatamanBundle.getString("fdata.deleteSelectedYes");
+      if (Services.prompt.confirmEx(window, title, msg, flags, yes, null, null,
+                                    null, {value: 0}) == 1) // 1=="Cancel" button
+        return;
+    }
+
+    this.tree.view.selection.clearSelection();
+    // Loop backwards so later indexes in the list don't change.
+    for (let i = selections.length - 1; i >= 0; i--) {
+      let delFData = this.formdata[this.displayedFormdata[selections[i]]];
+      this.formdata[this.displayedFormdata[selections[i]]] = null;
+      this.displayedFormdata.splice(selections[i], 1);
+      this.tree.treeBoxObject.rowCountChanged(selections[i], -1);
+      gLocSvc.fhist.removeEntry(delFData.fieldname, delFData.value);
+    }
   },
 
   search: function formdata_search(aSearchString) {
@@ -1005,8 +1033,9 @@ var gFormdata = {
     this.tree.treeBoxObject.beginUpdateBatch();
     this.displayedFormdata = [];
     for (let i = 0; i < this.formdata.length; i++) {
-      if (this.formdata[i].fieldname.toLocaleLowerCase().indexOf(aSearchString) != -1 ||
-          this.formdata[i].value.toLocaleLowerCase().indexOf(aSearchString) != -1)
+      if (this.formdata[i] &&
+          (this.formdata[i].fieldname.toLocaleLowerCase().indexOf(aSearchString) != -1 ||
+           this.formdata[i].value.toLocaleLowerCase().indexOf(aSearchString) != -1))
         this.displayedFormdata.push(i);
     }
     this.tree.treeBoxObject.endUpdateBatch();

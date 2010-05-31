@@ -284,6 +284,12 @@
             </treecols>
             <treechildren/>
           </tree>
+          <hbox id="formdataButtons">
+            <button id="fdataRemove" disabled="true"
+                    label="&fdata.button.remove.label;"
+                    accesskey="&fdata.button.remove.accesskey;"
+                    oncommand="gFormdata.delete();"/>
+          </hbox>
         </vbox>
 
         <vbox id="forgetPanel" flex="1">

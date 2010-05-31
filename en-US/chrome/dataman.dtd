@@ -116,6 +116,9 @@
 <!ENTITY fdatatree.firstused.label "First Used">
 <!ENTITY fdatatree.lastused.label "Last Used">
 
+<!ENTITY fdata.button.remove.label "Remove">
+<!ENTITY fdata.button.remove.accesskey "R">
+
 <!-- overlay -->
 <!ENTITY datamanCmd.label "Data Manager">
 <!ENTITY datamanCmd.accesskey "M">
