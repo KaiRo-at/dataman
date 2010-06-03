@@ -892,7 +892,7 @@ var gPrefs = {
         let enumerator =  gLocSvc.cpref.getPrefs(null).enumerator;
         while (enumerator.hasMoreElements()) {
           let pref = enumerator.getNext().QueryInterface(Components.interfaces.nsIProperty);
-          this.prefs.push({host: "*", name: pref.name, value: pref.value});
+          this.prefs.push({host: null, name: pref.name, value: pref.value});
           this.displayedPrefs.push(this.prefs.length - 1);
         }
       }
@@ -984,7 +984,7 @@ var prefsTreeView = {
     let cpref = gPrefs.prefs[gPrefs.displayedPrefs[aRow]];
     switch (aColumn.id) {
       case "prefsHostCol":
-        return cpref.host;
+        return cpref.host || "*";
       case "prefsNameCol":
         return cpref.name;
       case "prefsValueCol":
