@@ -37,9 +37,14 @@
 
 <!ENTITY dataman.windowTitle "Data Manager">
 
-<!ENTITY search.placeholder "Search Domains">
+<!ENTITY selectAll.key "a">
 
-<!ENTITY domaintree.domain.label "Domain">
+<!ENTITY domain.search.placeholder "Search Domains">
+<!ENTITY domain.search.key "f">
+
+<!ENTITY domain.tree.domain.label "Domain">
+
+<!ENTITY data.search.key "k">
 
 <!ENTITY tab.cookies.label "Cookies">
 <!ENTITY tab.permissions.label "Permissions">
@@ -51,11 +56,9 @@
 <!-- cookies -->
 <!ENTITY cookies.description "This domain has stored the following cookies on your computer:">
 
-<!ENTITY cookietree.host.label "Website">
-<!ENTITY cookietree.name.label "Cookie Name">
-<!ENTITY cookietree.expires.label "Expires">
-
-<!ENTITY cookietree.selectAll.key "A">
+<!ENTITY cookies.tree.host.label "Website">
+<!ENTITY cookies.tree.name.label "Cookie Name">
+<!ENTITY cookies.tree.expires.label "Expires">
 
 <!ENTITY cookies.infobox.label "Information about the selected Cookie">
 
@@ -84,16 +87,19 @@
 <!-- preferences -->
 <!ENTITY prefs.description "Content preferences are a way for &brandShortName; to make save of its settings, like zoom levels, specifically for a website.">
 
-<!ENTITY preftree.host.label "Website">
-<!ENTITY preftree.name.label "Preference Name">
-<!ENTITY preftree.value.label "Value">
+<!ENTITY prefs.tree.host.label "Website">
+<!ENTITY prefs.tree.name.label "Preference Name">
+<!ENTITY prefs.tree.value.label "Value">
+
+<!ENTITY prefs.button.remove.label "Remove">
+<!ENTITY prefs.button.remove.accesskey "R">
 
 <!-- passwords -->
-<!ENTITY passwords.description "You have the following passwords stored for this domain:">
+<!ENTITY pwd.description "You have the following passwords stored for this domain:">
 
-<!ENTITY pwdtree.host.label "Website">
-<!ENTITY pwdtree.username.label "Username">
-<!ENTITY pwdtree.password.label "Password">
+<!ENTITY pwd.tree.host.label "Website">
+<!ENTITY pwd.tree.username.label "Username">
+<!ENTITY pwd.tree.password.label "Password">
 
 <!ENTITY pwd.remove.label "Remove">
 <!ENTITY pwd.remove.accesskey "R">
@@ -106,15 +112,15 @@
 <!ENTITY pwd.button.remove.accesskey "R">
 
 <!-- form data -->
-<!ENTITY formdata.description "Form data is being remembered for any text field in any web form and is proposed automatically for fields with the same name on any websites you encounter.">
+<!ENTITY fdata.description "Form data is being remembered for any text field in any web form and is proposed automatically for fields with the same name on any websites you encounter.">
 
 <!ENTITY fdata.search.placeholder "Search Field Data">
 
-<!ENTITY fdatatree.fieldname.label "Field Name">
-<!ENTITY fdatatree.value.label "Entered Value">
-<!ENTITY fdatatree.usecount.label "Use Count">
-<!ENTITY fdatatree.firstused.label "First Used">
-<!ENTITY fdatatree.lastused.label "Last Used">
+<!ENTITY fdata.tree.fieldname.label "Field Name">
+<!ENTITY fdata.tree.value.label "Entered Value">
+<!ENTITY fdata.tree.usecount.label "Use Count">
+<!ENTITY fdata.tree.firstused.label "First Used">
+<!ENTITY fdata.tree.lastused.label "Last Used">
 
 <!ENTITY fdata.button.remove.label "Remove">
 <!ENTITY fdata.button.remove.accesskey "R">

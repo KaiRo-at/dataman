@@ -77,6 +77,7 @@ function initialize() {
 
 var gDomains = {
   tree: null,
+  searchfield: null,
 
   domains: {},
   domainObjects: [],
@@ -86,16 +87,15 @@ var gDomains = {
     this.tree = document.getElementById("domainTree");
     this.tree.view = domainTreeView;
 
+    this.searchfield = document.getElementById("domainSearch");
+
     // global "domain"
     this.domainObjects.push({title: "*", hasFormData: true});
 
     // add domains for all cookies we find
-    let enumerator = gLocSvc.cookie.enumerator;
-    while (enumerator.hasMoreElements()) {
-      let nextCookie = enumerator.getNext();
-      if (!nextCookie) break;
-      nextCookie = nextCookie.QueryInterface(Components.interfaces.nsICookie);
-      this._addDomainOrFlag(nextCookie.host.replace(/^\./, ""), "hasCookies");
+    gCookies.loadList();
+    for (let i = 0; i < gCookies.cookies.length; i++) {
+      this._addDomainOrFlag(gCookies.cookies[i].host.replace(/^\./, ""), "hasCookies");
     }
 
     // add domains for permissions
@@ -224,6 +224,10 @@ var gDomains = {
     this.tree.treeBoxObject.endUpdateBatch();
     this.sort();
   },
+
+  focusSearch: function domain_focusSearch() {
+    this.searchfield.focus();
+  },
 };
 
 var domainTreeView = {
@@ -261,7 +265,7 @@ var gTabs = {
 
   activePanel: null,
 
-  initialize: function() {
+  initialize: function tabs_initialize() {
     this.tabbox = document.getElementById("tabbox");
     this.cookiesTab = document.getElementById("cookiesTab");
     this.permissionsTab = document.getElementById("permissionsTab");
@@ -271,7 +275,7 @@ var gTabs = {
     this.forgetTab = document.getElementById("forgetTab");
   },
 
-  select: function() {
+  select: function tabs_select() {
     if (this.activePanel) {
       switch (this.activePanel) {
         case "cookiesPanel":
@@ -319,6 +323,31 @@ var gTabs = {
     }
     this.activePanel = this.tabbox.selectedPanel.id;
   },
+
+  selectAll: function tabs_selectAll() {
+    switch (this.activePanel) {
+      case "cookiesPanel":
+        gCookies.selectAll();
+        break;
+      case "preferencesPanel":
+        gPrefs.selectAll();
+        break;
+      case "passwordsPanel":
+        gPasswords.selectAll();
+        break;
+      case "formdataPanel":
+        gFormdata.selectAll();
+        break;
+    }
+  },
+
+  focusSearch: function tabs_focusSearch() {
+    switch (this.activePanel) {
+      case "formdataPanel":
+        gFormdata.focusSearch();
+        break;
+    }
+  },
 };
 
 
@@ -335,6 +364,7 @@ var gCookies = {
   blockOnRemove: null,
 
   cookies: [],
+  displayedCookies: [],
 
   initialize: function cookies_initialize() {
     this.tree = document.getElementById("cookiesTree");
@@ -352,24 +382,13 @@ var gCookies = {
     this.blockOnRemove = document.getElementById("cookieBlockOnRemove");
 
     this.tree.treeBoxObject.beginUpdateBatch();
-    let enumerator = gLocSvc.cookie.enumerator;
-    while (enumerator.hasMoreElements()) {
-      let nextCookie = enumerator.getNext();
-      if (!nextCookie) break;
-      nextCookie = nextCookie.QueryInterface(Components.interfaces.nsICookie);
-      let host = nextCookie.host;
-      if (gDomains.hostMatchesSelected(host.replace(/^\./, "")))
-        this.cookies.push({name: nextCookie.name,
-                           value: nextCookie.value,
-                           isDomain: nextCookie.isDomain,
-                           host: host,
-                           rawHost: (host.charAt(0) == ".") ? host.substring(1, host.length) : host,
-                           path: nextCookie.path,
-                           isSecure: nextCookie.isSecure,
-                           expires: this._getExpiresString(nextCookie.expires),
-                           expiresSortValue: nextCookie.expires}
-                         );
+    if (!this.cookies.length)
+      this.loadList();
+    for (let i = 0; i < this.cookies.length; i++) {
+      if (gDomains.hostMatchesSelected(this.cookies[i].host.replace(/^\./, "")))
+        this.displayedCookies.push(i);
     }
+    this.sort(null, false, false);
     this.tree.treeBoxObject.endUpdateBatch();
     this.tree.treeBoxObject.invalidate();
   },
@@ -377,7 +396,28 @@ var gCookies = {
   shutdown: function cookies_shutdown() {
     this.tree.view.selection.clearSelection();
     this.tree.view = null;
+    this.displayedCookies = [];
+  },
+
+  loadList: function cookies_loadList() {
     this.cookies = [];
+    let enumerator = gLocSvc.cookie.enumerator;
+    while (enumerator.hasMoreElements()) {
+      let nextCookie = enumerator.getNext();
+      if (!nextCookie) break;
+      nextCookie = nextCookie.QueryInterface(Components.interfaces.nsICookie);
+      let host = nextCookie.host;
+      this.cookies.push({name: nextCookie.name,
+                          value: nextCookie.value,
+                          isDomain: nextCookie.isDomain,
+                          host: host,
+                          rawHost: (host.charAt(0) == ".") ? host.substring(1, host.length) : host,
+                          path: nextCookie.path,
+                          isSecure: nextCookie.isSecure,
+                          expires: this._getExpiresString(nextCookie.expires),
+                          expiresSortValue: nextCookie.expires}
+                        );
+    }
   },
 
   _getExpiresString: function cookies__getExpiresString(aExpires) {
@@ -449,15 +489,70 @@ var gCookies = {
     if (aEvent.keyCode == KeyEvent.DOM_VK_DELETE) {
       this.delete();
     }
-    else if (aEvent.ctrlKey &&
-             String.fromCharCode(aEvent.charCode).toLocaleLowerCase() ==
-               this.tree.getAttribute("selectAllKey").charAt(0).toLocaleLowerCase()) {
-      this.selectAll();
-    }
   },
 
-  sort: function cookies_sort(aColumn, aUpdateSelection) {
-    Services.console.logStringMessage("Sort: " + aColumn);
+  sort: function cookies_sort(aColumn, aUpdateSelection, aInvertDirection) {
+    // make sure we have a valid column
+    let column = aColumn;
+    if (!column) {
+      let sortedCol = this.tree.columns.getSortedColumn();
+      if (sortedCol)
+        column = sortedCol.element;
+      else
+        column = document.getElementById("cookieHostCol");
+    }
+    else if (column.localName == "treecols" || column.localName == "splitter")
+      return;
+
+    if (!column || column.localName != "treecol") {
+      Components.utils.reportError("No column found to sort cookies by");
+      return;
+    }
+
+    let dirAscending = column.getAttribute("sortDirection") !=
+                       (aInvertDirection ? "ascending" : "descending");
+    let dirFactor = dirAscending ? 1 : -1;
+
+    // Clear attributes on all columns, we're setting them again after sorting
+    for (let node = column.parentNode.firstChild; node; node = node.nextSibling) {
+      node.removeAttribute("sortActive");
+      node.removeAttribute("sortDirection");
+    }
+
+    // Compare function for two formdata items
+    let compfunc = function formdata_sort_compare(aOne, aTwo) {
+      switch (column.id) {
+        case "cookieHostCol":
+          return dirFactor * gCookies.cookies[aOne].rawHost
+                             .localeCompare(gCookies.cookies[aTwo].rawHost);
+        case "cookieNameCol":
+          return dirFactor * gCookies.cookies[aOne].name
+                             .localeCompare(gCookies.cookies[aTwo].name);
+        case "cookieExpiresCol":
+          return dirFactor * (gCookies.cookies[aOne].expiresSortValue -
+                              gCookies.cookies[aTwo].expiresSortValue);
+      }
+      return 0;
+    };
+
+    if (aUpdateSelection) {
+      // Cache the current selection
+      //this._cacheSelection();
+    }
+    this.tree.view.selection.clearSelection();
+
+    // Do the actual sorting of the array
+    this.displayedCookies.sort(compfunc);
+    this.tree.treeBoxObject.invalidate();
+
+    if (aUpdateSelection) {
+      // Restore the previous selection
+      //this._restoreSelection();
+    }
+
+    // Set attributes to the sorting we did
+    column.setAttribute("sortActive", "true");
+    column.setAttribute("sortDirection", dirAscending ? "ascending" : "descending");
   },
 
   delete: function cookies_delete() {
@@ -478,8 +573,9 @@ var gCookies = {
     this.tree.view.selection.clearSelection();
     // Loop backwards so later indexes in the list don't change.
     for (let i = selections.length - 1; i >= 0; i--) {
-      let delCookie = this.cookies[selections[i]];
-      this.cookies.splice(selections[i], 1);
+      let delCookie = this.cookies[this.displayedCookies[selections[i]]];
+      this.cookies[this.displayedCookies[selections[i]]] = null;
+      this.displayedCookies.splice(selections[i], 1);
       this.tree.treeBoxObject.rowCountChanged(selections[i], -1);
       gLocSvc.cookie.remove(delCookie.host, delCookie.name, delCookie.path,
                             this.blockOnRemove.checked);
@@ -489,20 +585,21 @@ var gCookies = {
 
 var cookieTreeView = {
   get rowCount() {
-    return gCookies.cookies.length;
+    return gCookies.displayedCookies.length;
   },
   setTree: function(aTree) {},
   getImageSrc: function(aRow, aColumn) {},
   getProgressMode: function(aRow, aColumn) {},
   getCellValue: function(aRow, aColumn) {},
   getCellText: function(aRow, aColumn) {
+    let cookie = gCookies.cookies[gCookies.displayedCookies[aRow]];
     switch (aColumn.id) {
       case "cookieHostCol":
-        return gCookies.cookies[aRow].rawHost;
+        return cookie.rawHost;
       case "cookieNameCol":
-        return gCookies.cookies[aRow].name;
+        return cookie.name;
       case "cookieExpiresCol":
-        return gCookies.cookies[aRow].expires;
+        return cookie.expires;
     }
   },
   isSeparator: function(aIndex) { return false; },
@@ -596,10 +693,9 @@ var gPasswords = {
   toggleButton: null,
   pwdCol: null,
 
-  allSignons: null,
-
-  showPasswords: false,
+  allSignons: [],
   displayedSignons: [],
+  showPasswords: false,
 
   initialize: function passwords_initialize() {
     this.tree = document.getElementById("passwordsTree");
@@ -647,7 +743,7 @@ var gPasswords = {
     }
   },
 
-  sort: function passwords_sort(aColumn, aUpdateSelection) {
+  sort: function passwords_sort(aColumn, aUpdateSelection, aInvertDirection) {
     Services.console.logStringMessage("Sort: " + aColumn);
   },
 
@@ -775,12 +871,16 @@ var passwordTreeView = {
 
 var gPrefs = {
   tree: null,
+  removeButton: null,
 
   prefs: [],
+  displayedPrefs: [],
 
-  initialize: function() {
+  initialize: function prefs_initialize() {
     this.tree = document.getElementById("prefsTree");
     this.tree.view = prefsTreeView;
+
+    this.removeButton = document.getElementById("prefsRemove");
 
     this.tree.treeBoxObject.beginUpdateBatch();
     try {
@@ -795,6 +895,7 @@ var gPrefs = {
         while (enumerator.hasMoreElements()) {
           let pref = enumerator.getNext().QueryInterface(Components.interfaces.nsIProperty);
           this.prefs.push({host: statement.row["host"], name: pref.name, value: pref.value});
+          this.displayedPrefs.push(this.prefs.length - 1);
         }
       }
     }
@@ -805,47 +906,76 @@ var gPrefs = {
     this.tree.treeBoxObject.invalidate();
   },
 
-  shutdown: function() {
+  shutdown: function prefs_shutdown() {
     this.tree.view.selection.clearSelection();
     this.tree.view = null;
     this.prefs = [];
   },
 
-  select: function() {
-    Services.console.logStringMessage("Selected: " + this.tree.currentIndex);
+  select: function prefs_select() {
+    var selections = gDatamanUtils.getTreeSelections(this.tree);
+    this.removeButton.disabled = !selections.length;
+    return true;
   },
 
-  handleKeyPress: function(aEvent) {
+  selectAll: function prefs_selectAll() {
+    this.tree.view.selection.selectAll();
+  },
+
+  handleKeyPress: function prefs_handleKeyPress(aEvent) {
     if (aEvent.keyCode == KeyEvent.DOM_VK_DELETE) {
       this.delete();
     }
   },
 
-  sort: function(aColumn, aUpdateSelection) {
+  sort: function prefs_sort(aColumn, aUpdateSelection, aInvertDirection) {
     Services.console.logStringMessage("Sort: " + aColumn);
   },
 
-  delete: function() {
-    Services.console.logStringMessage("Pref delete requested");
+  delete: function prefs_delete() {
+    var selections = gDatamanUtils.getTreeSelections(this.tree);
+
+    if (selections.length > 1) {
+      let title = gDatamanBundle.getString("prefs.deleteSelectedTitle");
+      let msg = gDatamanBundle.getString("prefs.deleteSelected");
+      let flags = ((Services.prompt.BUTTON_TITLE_IS_STRING * Services.prompt.BUTTON_POS_0) +
+                   (Services.prompt.BUTTON_TITLE_CANCEL * Services.prompt.BUTTON_POS_1) +
+                   Services.prompt.BUTTON_POS_1_DEFAULT)
+      let yes = gDatamanBundle.getString("prefs.deleteSelectedYes");
+      if (Services.prompt.confirmEx(window, title, msg, flags, yes, null, null,
+                                    null, {value: 0}) == 1) // 1=="Cancel" button
+        return;
+    }
+
+    this.tree.view.selection.clearSelection();
+    // Loop backwards so later indexes in the list don't change.
+    for (let i = selections.length - 1; i >= 0; i--) {
+      let delPref = this.prefs[this.displayedPrefs[selections[i]]];
+      this.prefs[this.displayedPrefs[selections[i]]] = null;
+      this.displayedPrefs.splice(selections[i], 1);
+      this.tree.treeBoxObject.rowCountChanged(selections[i], -1);
+      gLocSvc.cpref.removePref(delPref.host, delPref.name);
+    }
   },
 };
 
 var prefsTreeView = {
   get rowCount() {
-    return gPrefs.prefs.length;
+    return gPrefs.displayedPrefs.length;
   },
   setTree: function(aTree) {},
   getImageSrc: function(aRow, aColumn) {},
   getProgressMode: function(aRow, aColumn) {},
   getCellValue: function(aRow, aColumn) {},
   getCellText: function(aRow, aColumn) {
+    let cpref = gPrefs.prefs[gPrefs.displayedPrefs[aRow]];
     switch (aColumn.id) {
       case "prefsHostCol":
-        return gPrefs.prefs[aRow].host;
+        return cpref.host;
       case "prefsNameCol":
-        return gPrefs.prefs[aRow].name;
+        return cpref.name;
       case "prefsValueCol":
-        return gPrefs.prefs[aRow].value;
+        return cpref.value;
     }
   },
   isSeparator: function(aIndex) { return false; },
@@ -861,6 +991,7 @@ var prefsTreeView = {
 var gFormdata = {
   tree: null,
   removeButton: null,
+  searchfield: null,
 
   formdata: [],
   displayedFormdata: [],
@@ -869,6 +1000,7 @@ var gFormdata = {
     this.tree = document.getElementById("formdataTree");
     this.tree.view = formdataTreeView;
 
+    this.searchfield = document.getElementById("fdataSearch");
     this.removeButton = document.getElementById("fdataRemove");
 
     if (!this.formdata.length) {
@@ -926,6 +1058,10 @@ var gFormdata = {
     var selections = gDatamanUtils.getTreeSelections(this.tree);
     this.removeButton.disabled = !selections.length;
     return true;
+  },
+
+  selectAll: function formdata_selectAll() {
+    this.tree.view.selection.selectAll();
   },
 
   handleKeyPress: function formdata_handleKeyPress(aEvent) {
@@ -1042,6 +1178,10 @@ var gFormdata = {
     }
     this.tree.treeBoxObject.endUpdateBatch();
     this.sort(null, false, false);
+  },
+
+  focusSearch: function formdata_focusSearch() {
+    this.searchfield.focus();
   },
 };
 

@@ -50,12 +50,36 @@
 <page xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
       id="data-page" title="&dataman.windowTitle;">
 
+  <script type="application/javascript"
+          src="chrome://dataman/content/dataman.js"/>
+
   <stringbundleset id="datamanBundleSet">
     <stringbundle id="datamanBundle" src="chrome://dataman/locale/dataman.properties"/>
   </stringbundleset>
 
-  <script type="application/javascript"
-          src="chrome://dataman/content/dataman.js"/>
+  <commandset id="datamanCommands">
+    <command id="cmd_selectAll"
+             oncommand="gTabs.selectAll();"/>
+    <command id="cmd_search_domain"
+             oncommand="gDomains.focusSearch();"/>
+    <command id="cmd_search_data"
+             oncommand="gTabs.focusSearch();"/>
+  </commandset>
+
+  <keyset id="datamanKeys">
+    <key id="key_selectAll"
+         command="cmd_selectAll"
+         key="&selectAll.key;"
+         modifiers="accel"/>
+    <key id="key_search_domain"
+         command="cmd_search_domain"
+         key="&domain.search.key;"
+         modifiers="accel"/>
+    <key id="key_search_data"
+         command="cmd_search_data"
+         key="&data.search.key;"
+         modifiers="accel"/>
+  </keyset>
 
   <popupset id="datamanContextSet">
     <popup id="passwordsTreeContextMenu"
@@ -81,11 +105,13 @@
                clickSelectsAll="true"
                type="search"
                class="compact"
-               placeholder="&search.placeholder;"
+               placeholder="&domain.search.placeholder;"
                oncommand="gDomains.search(this.value);"/>
       <tree id="domainTree" seltype="single" onselect="gDomains.select();" flex="1">
         <treecols>
-          <treecol id="domainCol" label="&domaintree.domain.label;" flex="1"/>
+          <treecol id="domainCol" flex="1"
+                   label="&domain.tree.domain.label;"
+                   sortDirection="ascending"/>
         </treecols>
         <treechildren/>
       </tree>
@@ -105,27 +131,27 @@
 
       <tabpanels id="tabpanels" flex="1">
         <vbox id="cookiesPanel" flex="1">
-          <description value="&cookies.description;"/>
+          <description>&cookies.description;</description>
           <tree id="cookiesTree" flex="1"
                     onkeypress="gCookies.handleKeyPress(event)"
-                    onselect="gCookies.select();"
-                    selectAllKey="&cookietree.selectAll.key;">
-            <treecols>
-              <treecol id="cookieHostCol" label="&cookietree.host.label;" flex="5"
-                       onclick="gCookies.sort('rawHost', true);" persist="width hidden"
-                       sortDirection="ascending"/>
+                    onselect="gCookies.select();">
+            <treecols onclick="gCookies.sort(event.target, true, true)">
+              <treecol id="cookieHostCol" flex="5"
+                       label="&cookies.tree.host.label;"
+                       persist="width hidden"/>
               <splitter class="tree-splitter"/>
-              <treecol id="cookieNameCol" label="&cookietree.name.label;" flex="5"
-                       onclick="gCookies.sort('name', true);" persist="width hidden"/>
+              <treecol id="cookieNameCol" flex="5"
+                       label="&cookies.tree.name.label;"
+                       persist="width hidden"/>
               <splitter class="tree-splitter"/>
-              <treecol id="CookieExpiresCol" label="&cookietree.expires.label;" flex="10"
-                       hidden="true" onclick="gCookies.sort('expires', true);" persist="width hidden"/>
+              <treecol id="cookieExpiresCol" flex="10"
+                       label="&cookies.tree.expires.label;"
+                       hidden="true" persist="width hidden"/>
             </treecols>
             <treechildren/>
           </tree>
           <groupbox>
             <caption label="&cookies.infobox.label;"/>
-            <!-- labels -->
             <grid flex="1">
               <columns>
                 <column/>
@@ -199,43 +225,51 @@
         </vbox>
 
         <vbox id="preferencesPanel" flex="1">
-          <description value="&prefs.description;"/>
+          <description>&prefs.description;</description>
           <tree id="prefsTree" flex="1"
                     onkeypress="gPrefs.handleKeyPress(event)"
                     onselect="gPrefs.select();">
-            <treecols>
-              <treecol id="prefsHostCol" label="&preftree.host.label;" flex="5"
-                       onclick="gPrefs.sort('host', true);" persist="width hidden"
-                       sortDirection="ascending"/>
+            <treecols onclick="gPrefs.sort(event.target, true, true)">
+              <treecol id="prefsHostCol" flex="5"
+                       label="&prefs.tree.host.label;"
+                       persist="width hidden"/>
               <splitter class="tree-splitter"/>
-              <treecol id="prefsNameCol" label="&preftree.name.label;" flex="5"
-                       onclick="gPrefs.sort('name', true);" persist="width hidden"
-                       sortDirection="ascending"/>
+              <treecol id="prefsNameCol" flex="5"
+                       label="&prefs.tree.name.label;"
+                       persist="width hidden"/>
               <splitter class="tree-splitter"/>
-              <treecol id="prefsValueCol" label="&preftree.value.label;" flex="10"
-                       onclick="gPrefs.sort('value', true);" persist="width hidden"/>
+              <treecol id="prefsValueCol" flex="10"
+                       label="&prefs.tree.value.label;"
+                       persist="width hidden"/>
             </treecols>
             <treechildren/>
           </tree>
+          <hbox id="prefsButtons">
+            <button id="prefsRemove" disabled="true"
+                    label="&prefs.button.remove.label;"
+                    accesskey="&prefs.button.remove.accesskey;"
+                    oncommand="gPrefs.delete();"/>
+          </hbox>
         </vbox>
 
         <vbox id="passwordsPanel" flex="1">
-          <description value="&passwords.description;"/>
+          <description>&pwd.description;</description>
           <tree id="passwordsTree" flex="1" hidecolumnpicker="true"
                 onkeypress="gPasswords.handleKeyPress(event)"
                 onselect="gPasswords.select();"
                 context="passwordsTreeContextMenu">
-            <treecols>
-              <treecol id="pwdHostCol" label="&pwdtree.host.label;" flex="5"
-                       onclick="gPasswords.sort('hostname');" persist="width"
-                       sortDirection="ascending"/>
+            <treecols onclick="gPasswords.sort(event.target, true, true)">
+              <treecol id="pwdHostCol" flex="5"
+                       label="&pwd.tree.host.label;"
+                       persist="width"/>
               <splitter class="tree-splitter"/>
-              <treecol id="pwdUserCol" label="&pwdtree.username.label;" flex="2"
-                       onclick="gPasswords.sort('username');" persist="width"/>
+              <treecol id="pwdUserCol" flex="2"
+                       label="&pwd.tree.username.label;"
+                       persist="width"/>
               <splitter class="tree-splitter"/>
-              <treecol id="pwdPasswordCol" label="&pwdtree.password.label;" flex="2"
-                       onclick="gPasswords.sort('password');" persist="width"
-                       hidden="true"/>
+              <treecol id="pwdPasswordCol" flex="2"
+                       label="&pwd.tree.password.label;"
+                       hidden="true" persist="width"/>
             </treecols>
             <treechildren/>
           </tree>
@@ -251,8 +285,8 @@
         </vbox>
 
         <vbox id="formdataPanel" flex="1">
-          <description value="&formdata.description;"/>
-          <textbox id="formdataSearch"
+          <description>&fdata.description;</description>
+          <textbox id="fdataSearch"
                    clickSelectsAll="true"
                    type="search"
                    class="compact"
@@ -263,23 +297,23 @@
                     onselect="gFormdata.select();">
             <treecols onclick="gFormdata.sort(event.target, true, true)">
               <treecol id="fdataFieldCol" flex="5"
-                       label="&fdatatree.fieldname.label;"
+                       label="&fdata.tree.fieldname.label;"
                        persist="width hidden"/>
               <splitter class="tree-splitter"/>
               <treecol id="fdataValueCol" flex="10"
-                       label="&fdatatree.value.label;"
+                       label="&fdata.tree.value.label;"
                        persist="width hidden"/>
               <splitter class="tree-splitter"/>
               <treecol id="fdataCountCol" flex="2"
-                       label="&fdatatree.usecount.label;"
+                       label="&fdata.tree.usecount.label;"
                        hidden="true" persist="width hidden"/>
               <splitter class="tree-splitter"/>
               <treecol id="fdataFirstCol" flex="10"
-                       label="&fdatatree.firstused.label;"
+                       label="&fdata.tree.firstused.label;"
                        hidden="true" persist="width hidden"/>
               <splitter class="tree-splitter"/>
               <treecol id="fdataLastCol" flex="10"
-                       label="&fdatatree.lastused.label;"
+                       label="&fdata.tree.lastused.label;"
                        hidden="true" persist="width hidden"/>
             </treecols>
             <treechildren/>
