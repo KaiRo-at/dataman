@@ -90,7 +90,9 @@ var gDomains = {
     this.searchfield = document.getElementById("domainSearch");
 
     // global "domain"
-    this.domainObjects.push({title: "*", hasFormData: true});
+    this.domainObjects.push({title: "*",
+                             hasPreferences: gLocSvc.cpref.getPrefs(null).enumerator.hasMoreElements(),
+                             hasFormData: true});
 
     // add domains for all cookies we find
     gCookies.loadList();
@@ -885,17 +887,28 @@ var gPrefs = {
     this.tree.treeBoxObject.beginUpdateBatch();
     try {
       // get all groups (hosts) that match the domain
-      let sql = "SELECT groups.name AS host FROM groups WHERE host=:hostName OR host LIKE :hostMatch ESCAPE '/'";
-      var statement = gLocSvc.cpref.DBConnection.createStatement(sql);
-      statement.params.hostName = gDomains.selectedDomainName;
-      statement.params.hostMatch = "%." + statement.escapeStringForLIKE(gDomains.selectedDomainName, "/");
-      while (statement.executeStep()) {
-        // now, get all prefs for that host
-        let enumerator =  gLocSvc.cpref.getPrefs(statement.row["host"]).enumerator;
+      let domain = gDomains.selectedDomainName;
+      if (domain == "*") {
+        let enumerator =  gLocSvc.cpref.getPrefs(null).enumerator;
         while (enumerator.hasMoreElements()) {
           let pref = enumerator.getNext().QueryInterface(Components.interfaces.nsIProperty);
-          this.prefs.push({host: statement.row["host"], name: pref.name, value: pref.value});
+          this.prefs.push({host: "*", name: pref.name, value: pref.value});
           this.displayedPrefs.push(this.prefs.length - 1);
+        }
+      }
+      else {
+        let sql = "SELECT groups.name AS host FROM groups WHERE host=:hostName OR host LIKE :hostMatch ESCAPE '/'";
+        var statement = gLocSvc.cpref.DBConnection.createStatement(sql);
+        statement.params.hostName = domain;
+        statement.params.hostMatch = "%." + statement.escapeStringForLIKE(domain, "/");
+        while (statement.executeStep()) {
+          // now, get all prefs for that host
+          let enumerator =  gLocSvc.cpref.getPrefs(statement.row["host"]).enumerator;
+          while (enumerator.hasMoreElements()) {
+            let pref = enumerator.getNext().QueryInterface(Components.interfaces.nsIProperty);
+            this.prefs.push({host: statement.row["host"], name: pref.name, value: pref.value});
+            this.displayedPrefs.push(this.prefs.length - 1);
+          }
         }
       }
     }
