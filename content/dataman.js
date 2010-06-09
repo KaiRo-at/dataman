@@ -215,6 +215,10 @@ var gDomains = {
     this.tree.treeBoxObject.invalidate();
   },
 
+  forget: function domain_forget() {
+    Services.console.logStringMessage("Forget data on: " + this.selectedDomainName);
+  },
+
   search: function domain_search(aSearchString) {
     this.tree.treeBoxObject.beginUpdateBatch();
     this.displayedDomains = [];
@@ -229,6 +233,9 @@ var gDomains = {
 
   focusSearch: function domain_focusSearch() {
     this.searchfield.focus();
+  },
+
+  updateContext: function domain_updateContext() {
   },
 };
 
@@ -387,7 +394,8 @@ var gCookies = {
     if (!this.cookies.length)
       this.loadList();
     for (let i = 0; i < this.cookies.length; i++) {
-      if (gDomains.hostMatchesSelected(this.cookies[i].host.replace(/^\./, "")))
+      if (this.cookies[i] &&
+          gDomains.hostMatchesSelected(this.cookies[i].host.replace(/^\./, "")))
         this.displayedCookies.push(i);
     }
     this.sort(null, false, false);
@@ -583,6 +591,13 @@ var gCookies = {
                             this.blockOnRemove.checked);
     }
   },
+
+  updateContext: function cookies_updateContext() {
+    document.getElementById("cookies-context-remove").disabled =
+      this.removeButton.disabled;
+    document.getElementById("cookies-context-selectall").disabled =
+      (this.tree.view.selection.count >= this.tree.view.rowCount);
+  },
 };
 
 var cookieTreeView = {
@@ -714,7 +729,8 @@ var gPasswords = {
     if (!this.allSignons)
       this.allSignons = gLocSvc.pwd.getAllLogins();
     for (let i = 0; i < this.allSignons.length; i++) {
-      if (this.allSignons[i] && gDomains.hostMatchesSelected(this.allSignons[i].hostname))
+      if (this.allSignons[i] &&
+          gDomains.hostMatchesSelected(this.allSignons[i].hostname))
         this.displayedSignons.push(i);
     }
     this.tree.treeBoxObject.endUpdateBatch();
@@ -923,6 +939,7 @@ var gPrefs = {
     this.tree.view.selection.clearSelection();
     this.tree.view = null;
     this.prefs = [];
+    this.displayedPrefs = [];
   },
 
   select: function prefs_select() {
@@ -969,6 +986,13 @@ var gPrefs = {
       this.tree.treeBoxObject.rowCountChanged(selections[i], -1);
       gLocSvc.cpref.removePref(delPref.host, delPref.name);
     }
+  },
+
+  updateContext: function prefs_updateContext() {
+    document.getElementById("prefs-context-remove").disabled =
+      this.removeButton.disabled;
+    document.getElementById("prefs-context-selectall").disabled =
+      (this.tree.view.selection.count >= this.tree.view.rowCount);
   },
 };
 
@@ -1195,6 +1219,13 @@ var gFormdata = {
 
   focusSearch: function formdata_focusSearch() {
     this.searchfield.focus();
+  },
+
+  updateContext: function formdata_updateContext() {
+    document.getElementById("fdata-context-remove").disabled =
+      this.removeButton.disabled;
+    document.getElementById("fdata-context-selectall").disabled =
+      (this.tree.view.selection.count >= this.tree.view.rowCount);
   },
 };
 
