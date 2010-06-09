@@ -39,6 +39,7 @@ Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
 Components.utils.import("resource://gre/modules/Services.jsm");
 
 window.addEventListener("load",  initialize, false);
+window.addEventListener("unload",  shutdown, false);
 
 // locally loaded services
 var gLocSvc = {};
@@ -75,6 +76,54 @@ function initialize() {
   gDomains.initialize();
 }
 
+function shutdown() {
+  gDomains.shutdown();
+}
+
+var gUpdatingBatch = "";
+var gChangeObserver = {
+  observe: function changeobserver_observe(aSubject, aTopic, aState) {
+    if (aTopic == gUpdatingBatch)
+      return;
+    switch (aTopic) {
+      case "cookie-changed":
+        // aState: added, changed, deleted
+        Services.console.logStringMessage("cookie change observed: " + aSubject + ", " + aState);
+        break;
+      case "perm-changed":
+        // aState: added, changed, deleted
+        Services.console.logStringMessage("permission change observed: " + aSubject + ", " + aState);
+        break;
+      case "passwordmgr-storage-changed":
+        if (/^hostSaving/.test(aState)) {
+          // aState: hostSavingEnabled, hostSavingDisabled
+          Services.console.logStringMessage("signon permission change observed: " + aSubject + ", " + aState);
+        }
+        else {
+          // aState: addLogin, modifyLogin, removeLogin, removeAllLogins
+          Services.console.logStringMessage("signon change observed: " + aSubject + ", " + aState);
+        }
+        break;
+      case "satchel-storage-changed":
+        // aState: addEntry, removeEntry
+        Services.console.logStringMessage("form data change observed: " + aSubject + ", " + aState);
+        break;
+      default:
+        // aState: addEntry, modifyEntry, removeEntry
+        Services.console.logStringMessage("form data change observed: " + aSubject + ", " + aState);
+        break;
+    }
+  },
+
+  onContentPrefSet: function changeobserver_onContentPrefSet(aGroup, aName, aValue) {
+    Services.console.logStringMessage("content pref setting observed: " + aGroup + ", " + aName + ", " + aValue);
+  },
+
+  onContentPrefRemoved: function changeobserver_onContentPrefRemoved(aGroup, aName) {
+    Services.console.logStringMessage("content pref removal observed: " + aGroup + ", " + aName);
+  },
+}
+
 var gDomains = {
   tree: null,
   searchfield: null,
@@ -88,6 +137,12 @@ var gDomains = {
     this.tree.view = domainTreeView;
 
     this.searchfield = document.getElementById("domainSearch");
+
+    Services.obs.addObserver(gChangeObserver, "cookie-changed", false);
+    Services.obs.addObserver(gChangeObserver, "perm-changed", false);
+    Services.obs.addObserver(gChangeObserver, "passwordmgr-storage-changed", false);
+    gLocSvc.cpref.addObserver(null, gChangeObserver);
+    Services.obs.addObserver(gChangeObserver, "satchel-storage-changed", false);
 
     // global "domain"
     this.domainObjects.push({title: "*",
@@ -133,6 +188,14 @@ var gDomains = {
     this.search("");
     this.tree.view.selection.select(0);
     gTabs.formdataTab.focus();
+  },
+
+  shutdown: function domain_shutdown() {
+    Services.obs.removeObserver(gChangeObserver, "cookie-changed");
+    Services.obs.removeObserver(gChangeObserver, "perm-changed");
+    Services.obs.removeObserver(gChangeObserver, "passwordmgr-storage-changed");
+    gLocSvc.cpref.removeObserver(null, gChangeObserver);
+    Services.obs.removeObserver(gChangeObserver, "satchel-storage-changed");
   },
 
   getDomainFromHost: function domain_getDomainFromHost(aHostname) {
