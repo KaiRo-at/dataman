@@ -1221,8 +1221,9 @@ var gFormdata = {
     };
 
     if (aUpdateSelection) {
-      // Cache the current selection
-      //this._cacheSelection();
+      var selectionCache = gDatamanUtils.getSelectedIDs(this.tree, this.formdata,
+                                                        this.displayedFormdata,
+                                                        "guid");
     }
     this.tree.view.selection.clearSelection();
 
@@ -1231,8 +1232,9 @@ var gFormdata = {
     this.tree.treeBoxObject.invalidate();
 
     if (aUpdateSelection) {
-      // Restore the previous selection
-      //this._restoreSelection();
+      gDatamanUtils.restoreSelectionFromIDs(this.tree, this.formdata,
+                                            this.displayedFormdata, "guid",
+                                            selectionCache);
     }
 
     // Set attributes to the sorting we did
@@ -1267,6 +1269,9 @@ var gFormdata = {
   },
 
   search: function formdata_search(aSearchString) {
+    var selectionCache = gDatamanUtils.getSelectedIDs(this.tree, this.formdata,
+                                                      this.displayedFormdata,
+                                                      "guid");
     this.tree.view.selection.clearSelection();
     this.tree.treeBoxObject.beginUpdateBatch();
     this.displayedFormdata = [];
@@ -1278,6 +1283,9 @@ var gFormdata = {
     }
     this.tree.treeBoxObject.endUpdateBatch();
     this.sort(null, false, false);
+    gDatamanUtils.restoreSelectionFromIDs(this.tree, this.formdata,
+                                          this.displayedFormdata, "guid",
+                                          selectionCache);
   },
 
   focusSearch: function formdata_focusSearch() {
@@ -1342,5 +1350,45 @@ gDatamanUtils = {
       }
     }
     return selections;
+  },
+
+  getSelectedIDs:
+  function datamanUtils_getSelectedIDs(aTree, aData, aDisplayData, aID) {
+    // get IDs of selected elements for later restoration
+    var selectionCache = [];
+    if (aTree.view.selection.count < 1)
+      return selectionCache;
+
+    // Walk all selected rows and cache theior download IDs
+    var start = {};
+    var end = {};
+    var numRanges = aTree.view.selection.getRangeCount();
+    for (let rg = 0; rg < numRanges; rg++){
+      aTree.view.selection.getRangeAt(rg, start, end);
+      for (let row = start.value; row <= end.value; row++){
+        selectionCache.push(aData[aDisplayData[row]][aID]);
+      }
+    }
+    return selectionCache;
+  },
+
+  restoreSelectionFromIDs:
+  function datamanUtils_getSelectedIDs(aTree, aData, aDisplayData, aID, aCachedIDs) {
+    // Restore selection from cached IDs (as possible)
+    if (!aCachedIDs.length)
+      return;
+
+    aTree.view.selection.clearSelection();
+    var dataLen = aDisplayData.length;
+    for each (let rowID in aCachedIDs) {
+      // Find out what row this is now and if possible, add it to the selection
+      let row = -1;
+      for (let idx = 0; idx < dataLen; idx++) {
+        if (aData[aDisplayData[idx]][aID] == rowID)
+          row = idx;
+      }
+      if (row != -1)
+        aTree.view.selection.rangedSelect(row, row, true);
+    }
   },
 }
