@@ -132,6 +132,8 @@ var gDomains = {
   domainObjects: [],
   displayedDomains: [],
 
+  ignoreSelect: false,
+
   initialize: function domain_initialize() {
     this.tree = document.getElementById("domainTree");
     this.tree.view = domainTreeView;
@@ -243,7 +245,21 @@ var gDomains = {
   },
 
   select: function domain_select() {
-    if (this.tree.view.selection.count != 1) {
+    if (this.ignoreSelect)
+      return;
+
+    if (!this.tree.view.selection.count) {
+      gTabs.cookiesTab.disabled = true;
+      gTabs.permissionsTab.disabled = true;
+      gTabs.preferencesTab.disabled = true;
+      gTabs.passwordsTab.disabled = true;
+      gTabs.formdataTab.hidden = true;
+      gTabs.formdataTab.disabled = true;
+      gTabs.select();
+      return;
+    }
+
+    if (this.tree.view.selection.count > 1) {
       Components.utils.reportError("Data Manager doesn't support anything but one selected domain");
       this.tree.view.selection.clearSelection();
       return;
@@ -283,6 +299,11 @@ var gDomains = {
   },
 
   search: function domain_search(aSearchString) {
+    this.ignoreSelect = true;
+    var selectionCache = gDatamanUtils.getSelectedIDs(this.tree, this.domainObjects,
+                                                      this.displayedDomains,
+                                                      "title");
+    this.tree.view.selection.clearSelection();
     this.tree.treeBoxObject.beginUpdateBatch();
     this.displayedDomains = [];
     for (let i = 0; i < this.domainObjects.length; i++) {
@@ -292,6 +313,13 @@ var gDomains = {
     }
     this.tree.treeBoxObject.endUpdateBatch();
     this.sort();
+    gDatamanUtils.restoreSelectionFromIDs(this.tree, this.domainObjects,
+                                          this.displayedDomains, "title",
+                                          selectionCache);
+    this.ignoreSelect = false;
+    // make sure we clear the data pane when selection has been removed
+    if (!this.tree.view.selection.count && selectionCache.length)
+      this.select();
   },
 
   focusSearch: function domain_focusSearch() {
