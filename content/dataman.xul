@@ -240,9 +240,9 @@
 
                 <row align="center">
                   <hbox align="center" pack="end">
-                    <label value="&cookies.info.secure.label;" control="cookieInfoIsSecure"/>
+                    <label value="&cookies.info.sendtype.label;" control="cookieInfoSendType"/>
                   </hbox>
-                  <textbox id="cookieInfoIsSecure" readonly="true" class="plain"/>
+                  <textbox id="cookieInfoSendType" readonly="true" class="plain"/>
                 </row>
 
                 <row align="center">

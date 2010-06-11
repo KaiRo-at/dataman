@@ -182,7 +182,7 @@ var gDomains = {
     }
 
     // add domains for passwords
-    gPasswords.allSignons = gLocSvc.pwd.getAllLogins();
+    gPasswords.loadList();
     for (let i = 0; i < gPasswords.allSignons.length; i++) {
       this._addDomainOrFlag(gPasswords.allSignons[i].hostname, "hasPasswords");
     }
@@ -198,6 +198,10 @@ var gDomains = {
     Services.obs.removeObserver(gChangeObserver, "passwordmgr-storage-changed");
     gLocSvc.cpref.removeObserver(null, gChangeObserver);
     Services.obs.removeObserver(gChangeObserver, "satchel-storage-changed");
+  },
+
+  _getObjID: function domain__getObjID(aIdx) {
+    return gDomains.domainObjects[gDomains.displayedDomains[aIdx]].title;
   },
 
   getDomainFromHost: function domain_getDomainFromHost(aHostname) {
@@ -266,7 +270,7 @@ var gDomains = {
       this.tree.view.selection.clearSelection();
       return;
     }
-    let selectedDomain = this.domainObjects[gDomains.displayedDomains[this.tree.currentIndex]];
+    let selectedDomain = this.domainObjects[this.displayedDomains[this.tree.currentIndex]];
     // disable/enable and hide/show the tabs as needed
     gTabs.cookiesTab.disabled = !selectedDomain.hasCookies;
     gTabs.permissionsTab.disabled = !selectedDomain.hasPermissions;
@@ -285,7 +289,7 @@ var gDomains = {
     if (!this.tree.view.selection.count)
       return false;
 
-    return this.domainObjects[gDomains.displayedDomains[this.tree.currentIndex]].title;
+    return this.domainObjects[this.displayedDomains[this.tree.currentIndex]].title;
   },
 
   sort: function domain_sort() {
@@ -307,9 +311,7 @@ var gDomains = {
 
   search: function domain_search(aSearchString) {
     this.ignoreSelect = true;
-    var selectionCache = gDatamanUtils.getSelectedIDs(this.tree, this.domainObjects,
-                                                      this.displayedDomains,
-                                                      "title");
+    var selectionCache = gDatamanUtils.getSelectedIDs(this.tree, this._getObjID);
     this.tree.view.selection.clearSelection();
     this.tree.treeBoxObject.beginUpdateBatch();
     this.displayedDomains = [];
@@ -320,8 +322,7 @@ var gDomains = {
     }
     this.tree.treeBoxObject.endUpdateBatch();
     this.sort();
-    gDatamanUtils.restoreSelectionFromIDs(this.tree, this.domainObjects,
-                                          this.displayedDomains, "title",
+    gDatamanUtils.restoreSelectionFromIDs(this.tree, this._getObjID,
                                           selectionCache);
     this.ignoreSelect = false;
     // make sure we clear the data pane when selection has been removed
@@ -468,7 +469,7 @@ var gCookies = {
   cookieInfoHostLabel: null,
   cookieInfoHost: null,
   cookieInfoPath: null,
-  cookieInfoIsSecure: null,
+  cookieInfoSendType: null,
   cookieInfoExpires: null,
   removeButton: null,
   blockOnRemove: null,
@@ -485,7 +486,7 @@ var gCookies = {
     this.cookieInfoHostLabel = document.getElementById("cookieInfoHostLabel");
     this.cookieInfoHost = document.getElementById("cookieInfoHost");
     this.cookieInfoPath = document.getElementById("cookieInfoPath");
-    this.cookieInfoIsSecure = document.getElementById("cookieInfoIsSecure");
+    this.cookieInfoSendType = document.getElementById("cookieInfoSendType");
     this.cookieInfoExpires = document.getElementById("cookieInfoExpires");
 
     this.removeButton = document.getElementById("cookieRemove");
@@ -519,16 +520,22 @@ var gCookies = {
       nextCookie = nextCookie.QueryInterface(Components.interfaces.nsICookie);
       let host = nextCookie.host;
       this.cookies.push({name: nextCookie.name,
-                          value: nextCookie.value,
-                          isDomain: nextCookie.isDomain,
-                          host: host,
-                          rawHost: (host.charAt(0) == ".") ? host.substring(1, host.length) : host,
-                          path: nextCookie.path,
-                          isSecure: nextCookie.isSecure,
-                          expires: this._getExpiresString(nextCookie.expires),
-                          expiresSortValue: nextCookie.expires}
-                        );
+                         value: nextCookie.value,
+                         isDomain: nextCookie.isDomain,
+                         host: host,
+                         rawHost: (host.charAt(0) == ".") ? host.substring(1, host.length) : host,
+                         path: nextCookie.path,
+                         isSecure: nextCookie.isSecure,
+                         isHttpOnly: nextCookie.isHttpOnly,
+                         expires: this._getExpiresString(nextCookie.expires),
+                         expiresSortValue: nextCookie.expires}
+                       );
     }
+  },
+
+  _getObjID: function cookies__getObjID(aIdx) {
+    var curCookie = gCookies.cookies[gCookies.displayedCookies[aIdx]];
+    return curCookie.host + "|" + curCookie.path + "|" + curCookie.name;
   },
 
   _getExpiresString: function cookies__getExpiresString(aExpires) {
@@ -567,19 +574,20 @@ var gCookies = {
     }
 
     // At this point, we have a single cookie selected.
-    var idx = selections[0];
+    var showCookie = this.cookies[this.displayedCookies[selections[0]]];
 
-    this.cookieInfoName.value = this.cookies[idx].name;
-    this.cookieInfoValue.value = this.cookies[idx].value;
-    this.cookieInfoHostLabel.value = this.cookies[idx].isDomain ?
+    this.cookieInfoName.value = showCookie.name;
+    this.cookieInfoValue.value = showCookie.value;
+    this.cookieInfoHostLabel.value = showCookie.isDomain ?
                                      this.cookieInfoHostLabel.getAttribute("value_domain") :
                                      this.cookieInfoHostLabel.getAttribute("value_host");
-    this.cookieInfoHost.value = this.cookies[idx].host;
-    this.cookieInfoPath.value = this.cookies[idx].path;
-    this.cookieInfoIsSecure.value = gDatamanBundle.getString(this.cookies[idx].isSecure ?
-                                                             "cookies.secureOnly" :
-                                                             "cookies.anyConnection");
-    this.cookieInfoExpires.value = this.cookies[idx].expires;
+    this.cookieInfoHost.value = showCookie.host;
+    this.cookieInfoPath.value = showCookie.path;
+    var typestringID = "cookies." +
+                       (showCookie.isSecure ? "secureOnly" : "anyConnection") +
+                       (showCookie.isHttpOnly ? ".httponly" : ".all");
+    this.cookieInfoSendType.value = gDatamanBundle.getString(typestringID);
+    this.cookieInfoExpires.value = showCookie.expires;
     return true;
   },
 
@@ -589,7 +597,7 @@ var gCookies = {
 
   _clearCookieInfo: function cookies__clearCookieInfo() {
     var fields = ["cookieInfoName", "cookieInfoValue", "cookieInfoHost",
-                  "cookieInfoPath", "cookieInfoIsSecure", "cookieInfoExpires"];
+                  "cookieInfoPath", "cookieInfoSendType", "cookieInfoExpires"];
     for (let i = 0; i < fields.length; i++) {
       this[fields[i]].value = "";
     }
@@ -647,8 +655,7 @@ var gCookies = {
     };
 
     if (aUpdateSelection) {
-      // Cache the current selection
-      //this._cacheSelection();
+      var selectionCache = gDatamanUtils.getSelectedIDs(this.tree, this._getObjID);
     }
     this.tree.view.selection.clearSelection();
 
@@ -657,8 +664,8 @@ var gCookies = {
     this.tree.treeBoxObject.invalidate();
 
     if (aUpdateSelection) {
-      // Restore the previous selection
-      //this._restoreSelection();
+      gDatamanUtils.restoreSelectionFromIDs(this.tree, this._getObjID,
+                                            selectionCache);
     }
 
     // Set attributes to the sorting we did
@@ -828,12 +835,13 @@ var gPasswords = {
 
     this.tree.treeBoxObject.beginUpdateBatch();
     if (!this.allSignons)
-      this.allSignons = gLocSvc.pwd.getAllLogins();
+      this.loadList();
     for (let i = 0; i < this.allSignons.length; i++) {
       if (this.allSignons[i] &&
           gDomains.hostMatchesSelected(this.allSignons[i].hostname))
         this.displayedSignons.push(i);
     }
+    this.sort(null, false, false);
     this.tree.treeBoxObject.endUpdateBatch();
     this.tree.treeBoxObject.invalidate();
   },
@@ -844,6 +852,16 @@ var gPasswords = {
     this.tree.view.selection.clearSelection();
     this.tree.view = null;
     this.displayedSignons = [];
+  },
+
+  loadList: function passwords_loadList() {
+    this.allSignons = [];
+    this.allSignons = gLocSvc.pwd.getAllLogins();
+  },
+
+  _getObjID: function passwords__getObjID(aIdx) {
+    var curSignon = gPasswords.allSignons[gPasswords.displayedSignons[aIdx]];
+    return curSignon.hostname + "|" + curSignon.httpRealm + "|" + curSignon.username;
   },
 
   select: function passwords_select() {
@@ -863,7 +881,66 @@ var gPasswords = {
   },
 
   sort: function passwords_sort(aColumn, aUpdateSelection, aInvertDirection) {
-    Services.console.logStringMessage("Sort: " + aColumn);
+    // make sure we have a valid column
+    let column = aColumn;
+    if (!column) {
+      let sortedCol = this.tree.columns.getSortedColumn();
+      if (sortedCol)
+        column = sortedCol.element;
+      else
+        column = document.getElementById("pwdHostCol");
+    }
+    else if (column.localName == "treecols" || column.localName == "splitter")
+      return;
+
+    if (!column || column.localName != "treecol") {
+      Components.utils.reportError("No column found to sort form data by");
+      return;
+    }
+
+    let dirAscending = column.getAttribute("sortDirection") !=
+                       (aInvertDirection ? "ascending" : "descending");
+    let dirFactor = dirAscending ? 1 : -1;
+
+    // Clear attributes on all columns, we're setting them again after sorting
+    for (let node = column.parentNode.firstChild; node; node = node.nextSibling) {
+      node.removeAttribute("sortActive");
+      node.removeAttribute("sortDirection");
+    }
+
+    // Compare function for two signons
+    let compfunc = function passwords_sort_compare(aOne, aTwo) {
+      switch (column.id) {
+        case "pwdHostCol":
+          return dirFactor * gPasswords.allSignons[aOne].hostname
+                             .localeCompare(gPasswords.allSignons[aTwo].hostname);
+        case "pwdUserCol":
+          return dirFactor * gPasswords.allSignons[aOne].username
+                             .localeCompare(gPasswords.allSignons[aTwo].username);
+        case "pwdPasswordCol":
+          return dirFactor * gPasswords.allSignons[aOne].password
+                             .localeCompare(gPasswords.allSignons[aTwo].password);
+      }
+      return 0;
+    };
+
+    if (aUpdateSelection) {
+      var selectionCache = gDatamanUtils.getSelectedIDs(this.tree, this._getObjID);
+    }
+    this.tree.view.selection.clearSelection();
+
+    // Do the actual sorting of the array
+    this.displayedSignons.sort(compfunc);
+    this.tree.treeBoxObject.invalidate();
+
+    if (aUpdateSelection) {
+      gDatamanUtils.restoreSelectionFromIDs(this.tree, this._getObjID,
+                                            selectionCache);
+    }
+
+    // Set attributes to the sorting we did
+    column.setAttribute("sortActive", "true");
+    column.setAttribute("sortDirection", dirAscending ? "ascending" : "descending");
   },
 
   delete: function passwords_delete() {
@@ -1154,7 +1231,7 @@ var gFormdata = {
                               lastUsed: this._getTimeString(statement.row["lastUsed"]),
                               lastUsedSortValue: statement.row["lastUsed"],
                               guid: statement.row["guid"]}
-                          );
+                            );
         }
       }
       finally {
@@ -1190,6 +1267,10 @@ var gFormdata = {
       return dtString;
     }
     return "";
+  },
+
+  _getObjID: function formdata__getObjID(aIdx) {
+    return gFormdata.formdata[gFormdata.displayedFormdata[aIdx]].guid;
   },
 
   select: function formdata_select() {
@@ -1259,9 +1340,7 @@ var gFormdata = {
     };
 
     if (aUpdateSelection) {
-      var selectionCache = gDatamanUtils.getSelectedIDs(this.tree, this.formdata,
-                                                        this.displayedFormdata,
-                                                        "guid");
+      var selectionCache = gDatamanUtils.getSelectedIDs(this.tree, this._getObjID);
     }
     this.tree.view.selection.clearSelection();
 
@@ -1270,8 +1349,7 @@ var gFormdata = {
     this.tree.treeBoxObject.invalidate();
 
     if (aUpdateSelection) {
-      gDatamanUtils.restoreSelectionFromIDs(this.tree, this.formdata,
-                                            this.displayedFormdata, "guid",
+      gDatamanUtils.restoreSelectionFromIDs(this.tree, this._getObjID,
                                             selectionCache);
     }
 
@@ -1307,9 +1385,7 @@ var gFormdata = {
   },
 
   search: function formdata_search(aSearchString) {
-    var selectionCache = gDatamanUtils.getSelectedIDs(this.tree, this.formdata,
-                                                      this.displayedFormdata,
-                                                      "guid");
+    var selectionCache = gDatamanUtils.getSelectedIDs(this.tree, this._getObjID);
     this.tree.view.selection.clearSelection();
     this.tree.treeBoxObject.beginUpdateBatch();
     this.displayedFormdata = [];
@@ -1321,8 +1397,7 @@ var gFormdata = {
     }
     this.tree.treeBoxObject.endUpdateBatch();
     this.sort(null, false, false);
-    gDatamanUtils.restoreSelectionFromIDs(this.tree, this.formdata,
-                                          this.displayedFormdata, "guid",
+    gDatamanUtils.restoreSelectionFromIDs(this.tree, this._getObjID,
                                           selectionCache);
   },
 
@@ -1391,38 +1466,38 @@ gDatamanUtils = {
   },
 
   getSelectedIDs:
-  function datamanUtils_getSelectedIDs(aTree, aData, aDisplayData, aID) {
+  function datamanUtils_getSelectedIDs(aTree, aIDFunction) {
     // get IDs of selected elements for later restoration
     var selectionCache = [];
     if (aTree.view.selection.count < 1)
       return selectionCache;
 
-    // Walk all selected rows and cache theior download IDs
+    // Walk all selected rows and cache their IDs
     var start = {};
     var end = {};
     var numRanges = aTree.view.selection.getRangeCount();
     for (let rg = 0; rg < numRanges; rg++){
       aTree.view.selection.getRangeAt(rg, start, end);
       for (let row = start.value; row <= end.value; row++){
-        selectionCache.push(aData[aDisplayData[row]][aID]);
+        selectionCache.push(aIDFunction(row));
       }
     }
     return selectionCache;
   },
 
   restoreSelectionFromIDs:
-  function datamanUtils_getSelectedIDs(aTree, aData, aDisplayData, aID, aCachedIDs) {
+  function datamanUtils_getSelectedIDs(aTree, aIDFunction, aCachedIDs) {
     // Restore selection from cached IDs (as possible)
     if (!aCachedIDs.length)
       return;
 
     aTree.view.selection.clearSelection();
-    var dataLen = aDisplayData.length;
+    var dataLen = aTree.view.rowCount;
     for each (let rowID in aCachedIDs) {
       // Find out what row this is now and if possible, add it to the selection
       let row = -1;
       for (let idx = 0; idx < dataLen; idx++) {
-        if (aData[aDisplayData[idx]][aID] == rowID)
+        if (aIDFunction(idx) == rowID)
           row = idx;
       }
       if (row != -1)
