@@ -255,6 +255,8 @@ var gDomains = {
       gTabs.passwordsTab.disabled = true;
       gTabs.formdataTab.hidden = true;
       gTabs.formdataTab.disabled = true;
+      gTabs.forgetTab.hidden = true;
+      gTabs.forgetTab.disabled = true;
       gTabs.select();
       return;
     }
@@ -272,6 +274,7 @@ var gDomains = {
     gTabs.passwordsTab.disabled = !selectedDomain.hasPasswords;
     gTabs.formdataTab.hidden = !selectedDomain.hasFormData;
     gTabs.formdataTab.disabled = !selectedDomain.hasFormData;
+    gTabs.forgetTab.hidden = true;
     while (gTabs.tabbox.selectedTab.disabled || gTabs.tabbox.selectedTab.hidden) {
       gTabs.tabbox.tabs.advanceSelectedTab(1, true);
     }
@@ -279,6 +282,9 @@ var gDomains = {
   },
 
   get selectedDomainName() {
+    if (!this.tree.view.selection.count)
+      return false;
+
     return this.domainObjects[gDomains.displayedDomains[this.tree.currentIndex]].title;
   },
 
@@ -295,7 +301,8 @@ var gDomains = {
   },
 
   forget: function domain_forget() {
-    Services.console.logStringMessage("Forget data on: " + this.selectedDomainName);
+    gTabs.forgetTab.hidden = false;
+    gTabs.tabbox.selectedTab = gTabs.forgetTab;
   },
 
   search: function domain_search(aSearchString) {
@@ -327,6 +334,8 @@ var gDomains = {
   },
 
   updateContext: function domain_updateContext() {
+    document.getElementById("domain-context-forget").disabled =
+      (!this.selectedDomainName || this.selectedDomainName == "*");
   },
 };
 
@@ -394,6 +403,7 @@ var gTabs = {
           gFormdata.shutdown();
           break;
         case "forgetPanel":
+          this.forgetTab.hidden = true;
           break;
       }
       this.activePanel = null;

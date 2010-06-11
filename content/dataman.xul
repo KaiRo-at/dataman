@@ -377,7 +377,7 @@
         </vbox>
 
         <vbox id="forgetPanel" flex="1">
-          <description value="dataman: forget panel"/>
+          <description>&forget.description;</description>
         </vbox>
       </tabpanels>
     </tabbox>

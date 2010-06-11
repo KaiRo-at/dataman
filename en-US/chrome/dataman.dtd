@@ -143,6 +143,9 @@
 <!ENTITY fdata.button.remove.label "Remove">
 <!ENTITY fdata.button.remove.accesskey "R">
 
+<!-- forget -->
+<!ENTITY forget.description "This function has not been implemented in this version. In future versions, this tab will offer to forget/delete all data for the currently selected domain.">
+
 <!-- overlay -->
 <!ENTITY datamanCmd.label "Data Manager">
 <!ENTITY datamanCmd.accesskey "M">
