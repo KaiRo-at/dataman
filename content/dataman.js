@@ -1109,6 +1109,7 @@ var gPrefs = {
     finally {
       statement.reset();
     }
+    this.sort(null, false, false);
     this.tree.treeBoxObject.endUpdateBatch();
     this.tree.treeBoxObject.invalidate();
   },
@@ -1118,6 +1119,11 @@ var gPrefs = {
     this.tree.view = null;
     this.prefs = [];
     this.displayedPrefs = [];
+  },
+
+  _getObjID: function prefs__getObjID(aIdx) {
+    var curPref = gPrefs.prefs[gPrefs.displayedPrefs[aIdx]];
+    return curPref.host + "|" + curPref.name;
   },
 
   select: function prefs_select() {
@@ -1137,7 +1143,66 @@ var gPrefs = {
   },
 
   sort: function prefs_sort(aColumn, aUpdateSelection, aInvertDirection) {
-    Services.console.logStringMessage("Sort: " + aColumn);
+    // make sure we have a valid column
+    let column = aColumn;
+    if (!column) {
+      let sortedCol = this.tree.columns.getSortedColumn();
+      if (sortedCol)
+        column = sortedCol.element;
+      else
+        column = document.getElementById("prefsHostCol");
+    }
+    else if (column.localName == "treecols" || column.localName == "splitter")
+      return;
+
+    if (!column || column.localName != "treecol") {
+      Components.utils.reportError("No column found to sort form data by");
+      return;
+    }
+
+    let dirAscending = column.getAttribute("sortDirection") !=
+                       (aInvertDirection ? "ascending" : "descending");
+    let dirFactor = dirAscending ? 1 : -1;
+
+    // Clear attributes on all columns, we're setting them again after sorting
+    for (let node = column.parentNode.firstChild; node; node = node.nextSibling) {
+      node.removeAttribute("sortActive");
+      node.removeAttribute("sortDirection");
+    }
+
+    // Compare function for two signons
+    let compfunc = function passwords_sort_compare(aOne, aTwo) {
+      switch (column.id) {
+        case "prefsHostCol":
+          return dirFactor * gPrefs.prefs[aOne].host
+                             .localeCompare(gPrefs.prefs[aTwo].host);
+        case "prefsNameCol":
+          return dirFactor * gPrefs.prefs[aOne].name
+                             .localeCompare(gPrefs.prefs[aTwo].name);
+        case "prefsValueCol":
+          return dirFactor * gPrefs.prefs[aOne].value
+                             .localeCompare(gPrefs.prefs[aTwo].value);
+      }
+      return 0;
+    };
+
+    if (aUpdateSelection) {
+      var selectionCache = gDatamanUtils.getSelectedIDs(this.tree, this._getObjID);
+    }
+    this.tree.view.selection.clearSelection();
+
+    // Do the actual sorting of the array
+    this.displayedPrefs.sort(compfunc);
+    this.tree.treeBoxObject.invalidate();
+
+    if (aUpdateSelection) {
+      gDatamanUtils.restoreSelectionFromIDs(this.tree, this._getObjID,
+                                            selectionCache);
+    }
+
+    // Set attributes to the sorting we did
+    column.setAttribute("sortActive", "true");
+    column.setAttribute("sortDirection", dirAscending ? "ascending" : "descending");
   },
 
   delete: function prefs_delete() {
