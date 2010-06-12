@@ -715,6 +715,10 @@ var gCookies = {
     document.getElementById("cookies-context-selectall").disabled =
       (this.tree.view.selection.count >= this.tree.view.rowCount);
   },
+
+  forget: function cookies_forget() {
+    Services.console.logStringMessage("forget cookies requested for: " + gDomains.selectedDomainName);
+  },
 };
 
 var cookieTreeView = {
@@ -817,6 +821,10 @@ var gPerms = {
         return Services.perms.ALLOW_ACTION;
     }
     return false;
+  },
+
+  forget: function permissions_forget() {
+    Services.console.logStringMessage("forget permissions requested for: " + gDomains.selectedDomainName);
   },
 };
 
@@ -1041,6 +1049,10 @@ var gPasswords = {
     let password = gPasswords.allSignons[gPasswords.displayedSignons[row]].password;
     gLocSvc.clipboard.copyString(password);
   },
+
+  forget: function passwords_forget() {
+    Services.console.logStringMessage("forget passwords requested for: " + gDomains.selectedDomainName);
+  },
 };
 
 var passwordTreeView = {
@@ -1245,6 +1257,10 @@ var gPrefs = {
       this.removeButton.disabled;
     document.getElementById("prefs-context-selectall").disabled =
       (this.tree.view.selection.count >= this.tree.view.rowCount);
+  },
+
+  forget: function prefs_forget() {
+    Services.console.logStringMessage("forget content prefs requested for: " + gDomains.selectedDomainName);
   },
 };
 
@@ -1485,6 +1501,10 @@ var gFormdata = {
     document.getElementById("fdata-context-selectall").disabled =
       (this.tree.view.selection.count >= this.tree.view.rowCount);
   },
+
+  forget: function formdata_forget() {
+    Services.console.logStringMessage("forget form data requested for: " + gDomains.selectedDomainName);
+  },
 };
 
 var formdataTreeView = {
@@ -1525,6 +1545,11 @@ var gForget = {
   forgetPreferences: null,
   forgetPasswords: null,
   forgetFormdata: null,
+  forgetCookiesLabel: null,
+  forgetPermissionsLabel: null,
+  forgetPreferencesLabel: null,
+  forgetPasswordsLabel: null,
+  forgetFormdataLabel: null,
   forgetButton: null,
 
   initialize: function formdata_initialize() {
@@ -1534,10 +1559,15 @@ var gForget = {
     this.forgetPreferences = document.getElementById("forgetPreferences");
     this.forgetPasswords = document.getElementById("forgetPasswords");
     this.forgetFormdata = document.getElementById("forgetFormdata");
+    this.forgetCookiesLabel = document.getElementById("forgetCookiesLabel");
+    this.forgetPermissionsLabel = document.getElementById("forgetPermissionsLabel");
+    this.forgetPreferencesLabel = document.getElementById("forgetPreferencesLabel");
+    this.forgetPasswordsLabel = document.getElementById("forgetPasswordsLabel");
+    this.forgetFormdataLabel = document.getElementById("forgetFormdataLabel");
     this.forgetButton = document.getElementById("forgetButton");
 
     let selectedDomain = gDomains.selectedDomainObj;
-    this.forgetDesc.value = gDatamanBundle.getFormattedString("forget.description",
+    this.forgetDesc.value = gDatamanBundle.getFormattedString("forget.desc.pre",
                                                               [selectedDomain.title]);
 
     this.forgetCookies.disabled = !selectedDomain.hasCookies;
@@ -1555,6 +1585,18 @@ var gForget = {
 
   shutdown: function formdata_shutdown() {
     this.forgetDesc.value = "";
+    this.forgetCookies.hidden = false;
+    this.forgetPermissions.hidden = false;
+    this.forgetPreferences.hidden = false;
+    this.forgetPasswords.hidden = false;
+    this.forgetFormdata.hidden = true;
+    this.forgetCookiesLabel.hidden = true;
+    this.forgetPermissionsLabel.hidden = true;
+    this.forgetPreferencesLabel.hidden = true;
+    this.forgetPasswordsLabel.hidden = true;
+    this.forgetFormdataLabel.hidden = true;
+    this.forgetButton.hidden = false;
+
     this.forgetCookies.checked = false;
     this.forgetPermissions.checked = false;
     this.forgetPreferences.checked = false;
@@ -1565,12 +1607,39 @@ var gForget = {
     this.forgetPreferences.disabled = true;
     this.forgetPasswords.disabled = true;
     this.forgetFormdata.disabled = true;
-    this.forgetFormdata.hidden = true;
     this.forgetButton.disabled = true;
   },
 
   forget: function forget_forget() {
-    Services.console.logStringMessage("forget requested");
+    if (this.forgetCookies.checked) {
+      gCookies.forget();
+      this.forgetCookiesLabel.hidden = false;
+    }
+    this.forgetCookies.hidden = true;
+    if (this.forgetPermissions.checked) {
+      gPerms.forget();
+      this.forgetPermissionsLabel.hidden = false;
+    }
+    this.forgetPermissions.hidden = true;
+    if (this.forgetPreferences.checked) {
+      gPrefs.forget();
+      this.forgetPreferencesLabel.hidden = false;
+    }
+    this.forgetPreferences.hidden = true;
+    if (this.forgetPasswords.checked) {
+      gPasswords.forget();
+      this.forgetPasswordsLabel.hidden = false;
+    }
+    this.forgetPasswords.hidden = true;
+    if (this.forgetFormdata.checked) {
+      gFormdata.forget();
+      this.forgetFormdataLabel.hidden = false;
+    }
+    this.forgetFormdata.hidden = true;
+
+    this.forgetDesc.value = gDatamanBundle.getFormattedString("forget.desc.post",
+                                                              [gDomains.selectedDomainName]);
+    this.forgetButton.hidden = true;
   },
 };
 

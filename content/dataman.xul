@@ -382,26 +382,36 @@
             <checkbox id="forgetCookies" disabled="true"
                       label="&forget.cookies.label;"
                       accesskey="&forget.cookies.accesskey;"/>
+            <label id="forgetCookiesLabel" hidden="true"
+                   value="&forget.cookies.label;"/>
           </hbox>
           <hbox>
             <checkbox id="forgetPermissions" disabled="true"
                       label="&forget.permissions.label;"
                       accesskey="&forget.permissions.accesskey;"/>
+            <label id="forgetPermissionsLabel" hidden="true"
+                   value="&forget.permissions.label;"/>
           </hbox>
           <hbox>
             <checkbox id="forgetPreferences" disabled="true"
                       label="&forget.preferences.label;"
                       accesskey="&forget.preferences.accesskey;"/>
+            <label id="forgetPreferencesLabel" hidden="true"
+                   value="&forget.preferences.label;"/>
           </hbox>
           <hbox>
             <checkbox id="forgetPasswords" disabled="true"
                       label="&forget.passwords.label;"
                       accesskey="&forget.passwords.accesskey;"/>
+            <label id="forgetPasswordsLabel" hidden="true"
+                   value="&forget.passwords.label;"/>
           </hbox>
           <hbox>
             <checkbox id="forgetFormdata" disabled="true" hidden="true"
                       label="&forget.formdata.label;"
                       accesskey="&forget.formdata.accesskey;"/>
+            <label id="forgetFormdataLabel" hidden="true"
+                   value="&forget.formdata.label;"/>
           </hbox>
           <hbox>
             <button id="forgetButton" disabled="true"
