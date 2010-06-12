@@ -517,15 +517,15 @@ var gCookies = {
     while (enumerator.hasMoreElements()) {
       let nextCookie = enumerator.getNext();
       if (!nextCookie) break;
-      nextCookie = nextCookie.QueryInterface(Components.interfaces.nsICookie);
-      let host = nextCookie.host;
+      nextCookie = nextCookie.QueryInterface(Components.interfaces.nsICookie2);
       this.cookies.push({name: nextCookie.name,
                          value: nextCookie.value,
                          isDomain: nextCookie.isDomain,
-                         host: host,
-                         rawHost: (host.charAt(0) == ".") ? host.substring(1, host.length) : host,
+                         host: nextCookie.host,
+                         rawHost: nextCookie.rawHost,
                          path: nextCookie.path,
                          isSecure: nextCookie.isSecure,
+                         isSession: nextCookie.isSession,
                          isHttpOnly: nextCookie.isHttpOnly,
                          expires: this._getExpiresString(nextCookie.expires),
                          expiresSortValue: nextCookie.expires}
