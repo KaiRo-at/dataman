@@ -270,7 +270,7 @@ var gDomains = {
       this.tree.view.selection.clearSelection();
       return;
     }
-    let selectedDomain = this.domainObjects[this.displayedDomains[this.tree.currentIndex]];
+    let selectedDomain = this.selectedDomainObj;
     // disable/enable and hide/show the tabs as needed
     gTabs.cookiesTab.disabled = !selectedDomain.hasCookies;
     gTabs.permissionsTab.disabled = !selectedDomain.hasPermissions;
@@ -283,6 +283,13 @@ var gDomains = {
       gTabs.tabbox.tabs.advanceSelectedTab(1, true);
     }
     gTabs.select();
+  },
+
+  get selectedDomainObj() {
+    if (!this.tree.view.selection.count)
+      return false;
+
+    return this.domainObjects[this.displayedDomains[this.tree.currentIndex]];
   },
 
   get selectedDomainName() {
@@ -405,6 +412,7 @@ var gTabs = {
           break;
         case "forgetPanel":
           this.forgetTab.hidden = true;
+          gForget.shutdown();
           break;
       }
       this.activePanel = null;
@@ -430,6 +438,7 @@ var gTabs = {
         gFormdata.initialize();
         break;
       case "forgetPanel":
+        gForget.initialize();
         break;
     }
     this.activePanel = this.tabbox.selectedPanel.id;
@@ -1507,6 +1516,62 @@ var formdataTreeView = {
   getRowProperties: function(aRow, aProp) {},
   getColumnProperties: function(aColumn, aProp) {},
   getCellProperties: function(aRow, aColumn, aProp) {}
+};
+
+var gForget = {
+  forgetDesc: null,
+  forgetCookies: null,
+  forgetPermissions: null,
+  forgetPreferences: null,
+  forgetPasswords: null,
+  forgetFormdata: null,
+  forgetButton: null,
+
+  initialize: function formdata_initialize() {
+    this.forgetDesc = document.getElementById("forgetDesc");
+    this.forgetCookies = document.getElementById("forgetCookies");
+    this.forgetPermissions = document.getElementById("forgetPermissions");
+    this.forgetPreferences = document.getElementById("forgetPreferences");
+    this.forgetPasswords = document.getElementById("forgetPasswords");
+    this.forgetFormdata = document.getElementById("forgetFormdata");
+    this.forgetButton = document.getElementById("forgetButton");
+
+    let selectedDomain = gDomains.selectedDomainObj;
+    this.forgetDesc.value = gDatamanBundle.getFormattedString("forget.description",
+                                                              [selectedDomain.title]);
+
+    this.forgetCookies.disabled = !selectedDomain.hasCookies;
+    this.forgetPermissions.disabled = !selectedDomain.hasPermissions;
+    this.forgetPreferences.disabled = !selectedDomain.hasPreferences;
+    this.forgetPasswords.disabled = !selectedDomain.hasPasswords;
+    this.forgetFormdata.disabled = !selectedDomain.hasFormData;
+    this.forgetFormdata.hidden = !selectedDomain.hasFormData;
+    this.forgetButton.disabled = !(selectedDomain.hasCookies ||
+                                   selectedDomain.hasPermissions ||
+                                   selectedDomain.hasPreferences ||
+                                   selectedDomain.hasPasswords ||
+                                   selectedDomain.hasFormData);
+  },
+
+  shutdown: function formdata_shutdown() {
+    this.forgetDesc.value = "";
+    this.forgetCookies.checked = false;
+    this.forgetPermissions.checked = false;
+    this.forgetPreferences.checked = false;
+    this.forgetPasswords.checked = false;
+    this.forgetFormdata.checked = false;
+    this.forgetCookies.disabled = true;
+    this.forgetPermissions.disabled = true;
+    this.forgetPreferences.disabled = true;
+    this.forgetPasswords.disabled = true;
+    this.forgetFormdata.disabled = true;
+    this.forgetFormdata.hidden = true;
+    this.forgetButton.disabled = true;
+  },
+
+  forget: function forget_forget() {
+    Services.console.logStringMessage("forget requested");
+  },
 };
 
 

@@ -146,6 +146,20 @@
 <!-- forget -->
 <!ENTITY forget.description "This function has not been implemented in this version. In future versions, this tab will offer to forget/delete all data for the currently selected domain.">
 
+<!ENTITY forget.cookies.label "Cookies">
+<!ENTITY forget.cookies.accesskey "C">
+<!ENTITY forget.permissions.label "Permissions">
+<!ENTITY forget.permissions.accesskey "P">
+<!ENTITY forget.preferences.label "Content Preferences">
+<!ENTITY forget.preferences.accesskey "o">
+<!ENTITY forget.passwords.label "Passwords">
+<!ENTITY forget.passwords.accesskey "a">
+<!ENTITY forget.formdata.label "Form Data">
+<!ENTITY forget.formdata.accesskey "D">
+
+<!ENTITY forget.button.label "Forget This Data">
+<!ENTITY forget.button.accesskey "F">
+
 <!-- overlay -->
 <!ENTITY datamanCmd.label "Data Manager">
 <!ENTITY datamanCmd.accesskey "M">

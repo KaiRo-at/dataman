@@ -377,7 +377,38 @@
         </vbox>
 
         <vbox id="forgetPanel" flex="1">
-          <description>&forget.description;</description>
+          <description id="forgetDesc">&forget.description;</description>
+          <hbox>
+            <checkbox id="forgetCookies" disabled="true"
+                      label="&forget.cookies.label;"
+                      accesskey="&forget.cookies.accesskey;"/>
+          </hbox>
+          <hbox>
+            <checkbox id="forgetPermissions" disabled="true"
+                      label="&forget.permissions.label;"
+                      accesskey="&forget.permissions.accesskey;"/>
+          </hbox>
+          <hbox>
+            <checkbox id="forgetPreferences" disabled="true"
+                      label="&forget.preferences.label;"
+                      accesskey="&forget.preferences.accesskey;"/>
+          </hbox>
+          <hbox>
+            <checkbox id="forgetPasswords" disabled="true"
+                      label="&forget.passwords.label;"
+                      accesskey="&forget.passwords.accesskey;"/>
+          </hbox>
+          <hbox>
+            <checkbox id="forgetFormdata" disabled="true" hidden="true"
+                      label="&forget.formdata.label;"
+                      accesskey="&forget.formdata.accesskey;"/>
+          </hbox>
+          <hbox>
+            <button id="forgetButton" disabled="true"
+                    label="&forget.button.label;"
+                    accesskey="&forget.button.accesskey;"
+                    oncommand="gForget.forget();"/>
+          </hbox>
         </vbox>
       </tabpanels>
     </tabbox>
