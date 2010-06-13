@@ -44,8 +44,10 @@
 
 <!ENTITY domain.tree.domain.label "Domain">
 
-<!ENTITY domain.ctx.forget.label "Forget About This Domain">
-<!ENTITY domain.ctx.forget.accesskey "F">
+<!ENTITY domain.ctx.forgetdomain.label "Forget About This Domain">
+<!ENTITY domain.ctx.forgetdomain.accesskey "F">
+<!ENTITY domain.ctx.forgetglobal.label "Forget Global Data">
+<!ENTITY domain.ctx.forgetglobal.accesskey "F">
 
 <!ENTITY data.search.key "k">
 
@@ -125,8 +127,6 @@
 <!ENTITY pwd.button.remove.accesskey "R">
 
 <!-- form data -->
-<!ENTITY fdata.description "Form data is being remembered for any text field in any web form and is proposed automatically for fields with the same name on any websites you encounter.">
-
 <!ENTITY fdata.search.placeholder "Search Field Data">
 
 <!ENTITY fdata.tree.fieldname.label "Field Name">

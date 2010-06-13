@@ -105,7 +105,7 @@ var gChangeObserver = {
         }
         break;
       case "satchel-storage-changed":
-        // aState: addEntry, removeEntry
+        // aState: addEntry, removeEntry, removeAllEntries
         Services.console.logStringMessage("form data change observed: " + aSubject + ", " + aState);
         break;
       default:
@@ -342,8 +342,14 @@ var gDomains = {
   },
 
   updateContext: function domain_updateContext() {
-    document.getElementById("domain-context-forget").disabled =
-      (!this.selectedDomainName || this.selectedDomainName == "*");
+    let forgetCtx = document.getElementById("domain-context-forget");
+    forgetCtx.disabled = !this.selectedDomainName;
+    forgetCtx.label = (this.selectedDomainName == "*") ?
+                      forgetCtx.getAttribute("label_global") :
+                      forgetCtx.getAttribute("label_domain");
+    forgetCtx.accesskey = (this.selectedDomainName == "*") ?
+                          forgetCtx.getAttribute("accesskey_global") :
+                          forgetCtx.getAttribute("accesskey_domain");
   },
 };
 
@@ -717,7 +723,14 @@ var gCookies = {
   },
 
   forget: function cookies_forget() {
-    Services.console.logStringMessage("forget cookies requested for: " + gDomains.selectedDomainName);
+    for (let i = 0; i < this.cookies.length; i++) {
+      if (this.cookies[i] &&
+          gDomains.hostMatchesSelected(this.cookies[i].host.replace(/^\./, ""))) {
+        gLocSvc.cookie.remove(this.cookies[i].host, this.cookies[i].name,
+                              this.cookies[i].path, false);
+        this.cookies[i] = null;
+      }
+    }
   },
 };
 
@@ -824,7 +837,26 @@ var gPerms = {
   },
 
   forget: function permissions_forget() {
-    Services.console.logStringMessage("forget permissions requested for: " + gDomains.selectedDomainName);
+    let delPerms = [];
+    let enumerator = Services.perms.enumerator;
+    while (enumerator.hasMoreElements()) {
+      let nextPermission = enumerator.getNext();
+      nextPermission = nextPermission.QueryInterface(Components.interfaces.nsIPermission);
+      let host = nextPermission.host;
+      if (gDomains.hostMatchesSelected(host.replace(/^\./, ""))) {
+        delPerms.push({host: host, type: nextPermission.type});
+      }
+    }
+    for (let i = 0; i < delPerms.length; i++) {
+      Services.perms.remove(delPerms[i].host, delPerms[i].type);
+    }
+    // also remove all password rejects
+    let rejectHosts = gLocSvc.pwd.getAllDisabledHosts();
+    for (let i = 0; i < rejectHosts.length; i++) {
+      if (gDomains.hostMatchesSelected(rejectHosts[i])) {
+        gLocSvc.pwd.setLoginSavingEnabled(rejectHosts[i], true);
+      }
+    }
   },
 };
 
@@ -1051,7 +1083,13 @@ var gPasswords = {
   },
 
   forget: function passwords_forget() {
-    Services.console.logStringMessage("forget passwords requested for: " + gDomains.selectedDomainName);
+    for (let i = 0; i < this.allSignons.length; i++) {
+      if (this.allSignons[i] &&
+          gDomains.hostMatchesSelected(this.allSignons[i].hostname)) {
+        gLocSvc.pwd.removeLogin(this.allSignons[i]);
+        this.allSignons[i] = null;
+      }
+    }
   },
 };
 
@@ -1260,7 +1298,38 @@ var gPrefs = {
   },
 
   forget: function prefs_forget() {
-    Services.console.logStringMessage("forget content prefs requested for: " + gDomains.selectedDomainName);
+    let delPrefs = [];
+    try {
+      // get all groups (hosts) that match the domain
+      let domain = gDomains.selectedDomainName;
+      if (domain == "*") {
+        let enumerator =  gLocSvc.cpref.getPrefs(null).enumerator;
+        while (enumerator.hasMoreElements()) {
+          let pref = enumerator.getNext().QueryInterface(Components.interfaces.nsIProperty);
+          delPrefs.push({host: null, name: pref.name, value: pref.value});
+        }
+      }
+      else {
+        let sql = "SELECT groups.name AS host FROM groups WHERE host=:hostName OR host LIKE :hostMatch ESCAPE '/'";
+        var statement = gLocSvc.cpref.DBConnection.createStatement(sql);
+        statement.params.hostName = domain;
+        statement.params.hostMatch = "%." + statement.escapeStringForLIKE(domain, "/");
+        while (statement.executeStep()) {
+          // now, get all prefs for that host
+          let enumerator =  gLocSvc.cpref.getPrefs(statement.row["host"]).enumerator;
+          while (enumerator.hasMoreElements()) {
+            let pref = enumerator.getNext().QueryInterface(Components.interfaces.nsIProperty);
+            delPrefs.push({host: statement.row["host"], name: pref.name, value: pref.value});
+          }
+        }
+      }
+    }
+    finally {
+      statement.reset();
+    }
+    for (let i = 0; i < delPrefs.length; i++) {
+      gLocSvc.cpref.removePref(delPrefs[i].host, delPrefs[i].name);
+    }
   },
 };
 
@@ -1503,7 +1572,7 @@ var gFormdata = {
   },
 
   forget: function formdata_forget() {
-    Services.console.logStringMessage("forget form data requested for: " + gDomains.selectedDomainName);
+    gLocSvc.fhist.removeAllEntries();
   },
 };
 
@@ -1567,8 +1636,11 @@ var gForget = {
     this.forgetButton = document.getElementById("forgetButton");
 
     let selectedDomain = gDomains.selectedDomainObj;
-    this.forgetDesc.value = gDatamanBundle.getFormattedString("forget.desc.pre",
-                                                              [selectedDomain.title]);
+    if (selectedDomain.title == "*")
+      this.forgetDesc.value = gDatamanBundle.getString("forget.desc.global.pre");
+    else
+      this.forgetDesc.value = gDatamanBundle.getFormattedString("forget.desc.domain.pre",
+                                                                [selectedDomain.title]);
 
     this.forgetCookies.disabled = !selectedDomain.hasCookies;
     this.forgetPermissions.disabled = !selectedDomain.hasPermissions;
@@ -1637,8 +1709,11 @@ var gForget = {
     }
     this.forgetFormdata.hidden = true;
 
-    this.forgetDesc.value = gDatamanBundle.getFormattedString("forget.desc.post",
-                                                              [gDomains.selectedDomainName]);
+    if (gDomains.selectedDomainName == "*")
+      this.forgetDesc.value = gDatamanBundle.getString("forget.desc.global.post");
+    else
+      this.forgetDesc.value = gDatamanBundle.getFormattedString("forget.desc.domain.post",
+                                                                [gDomains.selectedDomainName]);
     this.forgetButton.hidden = true;
   },
 };

@@ -85,8 +85,10 @@
     <popup id="domainTreeContextMenu"
            onpopupshowing="gDomains.updateContext()">
       <menuitem id="domain-context-forget"
-                label="&domain.ctx.forget.label;"
-                accesskey="&domain.ctx.forget.accesskey;"
+                label_domain="&domain.ctx.forgetdomain.label;"
+                accesskey_domain="&domain.ctx.forgetdomain.accesskey;"
+                label_global="&domain.ctx.forgetglobal.label;"
+                accesskey_global="&domain.ctx.forgetglobal.accesskey;"
                 oncommand="gDomains.forget();"/>
     </popup>
 
@@ -334,7 +336,7 @@
         </vbox>
 
         <vbox id="formdataPanel" flex="1">
-          <description>&fdata.description;</description>
+          <description></description>
           <textbox id="fdataSearch"
                    clickSelectsAll="true"
                    type="search"
