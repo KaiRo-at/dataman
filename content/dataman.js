@@ -88,29 +88,68 @@ var gChangeObserver = {
     switch (aTopic) {
       case "cookie-changed":
         // aState: added, changed, deleted
-        Services.console.logStringMessage("cookie change observed: " + aSubject + ", " + aState);
+        aSubject.QueryInterface(Components.interfaces.nsICookie2);
+        Services.console.logStringMessage("cookie change observed: " + aSubject.host + "::" + aSubject.name + ", " + aState);
         break;
       case "perm-changed":
         // aState: added, changed, deleted
-        Services.console.logStringMessage("permission change observed: " + aSubject + ", " + aState);
+        aSubject.QueryInterface(Components.interfaces.nsIPermission);
+        Services.console.logStringMessage("permission change observed: " + aSubject.host + "::" + aSubject.type  + ", " + aState);
         break;
       case "passwordmgr-storage-changed":
         if (/^hostSaving/.test(aState)) {
           // aState: hostSavingEnabled, hostSavingDisabled
+          aSubject.QueryInterface(Components.interfaces.nsISupportsString);
           Services.console.logStringMessage("signon permission change observed: " + aSubject + ", " + aState);
         }
         else {
           // aState: addLogin, modifyLogin, removeLogin, removeAllLogins
-          Services.console.logStringMessage("signon change observed: " + aSubject + ", " + aState);
+          let data = null;
+          if (aSubject instanceof Components.interfaces.nsIArray) {
+            let dataList = [];
+            let enumerator = aSubject.enumerate();
+            while (enumerator.hasMoreElements()) {
+              let nextElem = enumerator.getNext();
+              nextElem.QueryInterface(Components.interfaces.nsILoginInfo);
+              dataList.push(nextElem.hostname + "|" + nextElem.httpRealm + "|" + nextElem.username);
+            }
+            data = dataList.join("::");
+          }
+          else if (aSubject instanceof Components.interfaces.nsILoginInfo) {
+            data = aSubject.hostname + "|" + aSubject.httpRealm + "|" + aSubject.username;
+          }
+          else if (aSubject instanceof Components.interfaces.nsISupportsString) {
+            data = aSubject.data;
+          }
+          else {
+            data = aSubject;
+          }
+          Services.console.logStringMessage("signon change observed: " + data + ", " + aState);
         }
         break;
       case "satchel-storage-changed":
         // aState: addEntry, removeEntry, removeAllEntries
-        Services.console.logStringMessage("form data change observed: " + aSubject + ", " + aState);
+        let data = null;
+        if (aSubject instanceof Components.interfaces.nsIArray) {
+          let dataList = [];
+          let enumerator = aSubject.enumerate();
+          while (enumerator.hasMoreElements()) {
+            let nextElem = enumerator.getNext();
+            if (nextElem instanceof Components.interfaces.nsISupportsString ||
+                nextElem instanceof Components.interfaces.nsISupportsPRInt64) {
+              dataList.push(nextElem);
+            }
+          }
+          data = dataList.join("|");
+        }
+        else if (aSubject instanceof Components.interfaces.nsISupportsString ||
+              aSubject instanceof Components.interfaces.nsISupportsPRInt64) {
+          data = aSubject;
+        }
+        Services.console.logStringMessage("form data change observed: " + data + ", " + aState);
         break;
       default:
-        // aState: addEntry, modifyEntry, removeEntry
-        Services.console.logStringMessage("form data change observed: " + aSubject + ", " + aState);
+        Services.console.logStringMessage("data change observed: " + aSubject + ", " + aState);
         break;
     }
   },
