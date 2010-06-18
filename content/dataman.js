@@ -80,86 +80,38 @@ function shutdown() {
   gDomains.shutdown();
 }
 
-var gUpdatingBatch = "";
 var gChangeObserver = {
   observe: function changeobserver_observe(aSubject, aTopic, aState) {
-    if (aTopic == gUpdatingBatch)
-      return;
     switch (aTopic) {
       case "cookie-changed":
-        // aState: added, changed, deleted
-        aSubject.QueryInterface(Components.interfaces.nsICookie2);
-        Services.console.logStringMessage("cookie change observed: " + aSubject.host + "::" + aSubject.name + ", " + aState);
+        gCookies.reactToChange(aSubject, aState);
         break;
       case "perm-changed":
-        // aState: added, changed, deleted
-        aSubject.QueryInterface(Components.interfaces.nsIPermission);
-        Services.console.logStringMessage("permission change observed: " + aSubject.host + "::" + aSubject.type  + ", " + aState);
+        gPerms.reactToChange(aSubject, aState);
         break;
       case "passwordmgr-storage-changed":
         if (/^hostSaving/.test(aState)) {
-          // aState: hostSavingEnabled, hostSavingDisabled
-          aSubject.QueryInterface(Components.interfaces.nsISupportsString);
-          Services.console.logStringMessage("signon permission change observed: " + aSubject + ", " + aState);
+          gPerms.reactToChange(aSubject, aState);
         }
         else {
-          // aState: addLogin, modifyLogin, removeLogin, removeAllLogins
-          let data = null;
-          if (aSubject instanceof Components.interfaces.nsIArray) {
-            let dataList = [];
-            let enumerator = aSubject.enumerate();
-            while (enumerator.hasMoreElements()) {
-              let nextElem = enumerator.getNext();
-              nextElem.QueryInterface(Components.interfaces.nsILoginInfo);
-              dataList.push(nextElem.hostname + "|" + nextElem.httpRealm + "|" + nextElem.username);
-            }
-            data = dataList.join("::");
-          }
-          else if (aSubject instanceof Components.interfaces.nsILoginInfo) {
-            data = aSubject.hostname + "|" + aSubject.httpRealm + "|" + aSubject.username;
-          }
-          else if (aSubject instanceof Components.interfaces.nsISupportsString) {
-            data = aSubject.data;
-          }
-          else {
-            data = aSubject;
-          }
-          Services.console.logStringMessage("signon change observed: " + data + ", " + aState);
+          gPasswords.reactToChange(aSubject, aState);
         }
         break;
       case "satchel-storage-changed":
-        // aState: addEntry, removeEntry, removeAllEntries
-        let data = null;
-        if (aSubject instanceof Components.interfaces.nsIArray) {
-          let dataList = [];
-          let enumerator = aSubject.enumerate();
-          while (enumerator.hasMoreElements()) {
-            let nextElem = enumerator.getNext();
-            if (nextElem instanceof Components.interfaces.nsISupportsString ||
-                nextElem instanceof Components.interfaces.nsISupportsPRInt64) {
-              dataList.push(nextElem);
-            }
-          }
-          data = dataList.join("|");
-        }
-        else if (aSubject instanceof Components.interfaces.nsISupportsString ||
-              aSubject instanceof Components.interfaces.nsISupportsPRInt64) {
-          data = aSubject;
-        }
-        Services.console.logStringMessage("form data change observed: " + data + ", " + aState);
+        gFormdata.reactToChange(aSubject, aState);
         break;
       default:
-        Services.console.logStringMessage("data change observed: " + aSubject + ", " + aState);
+        // unexpected topic observed, should we report an error/warning?
         break;
     }
   },
 
   onContentPrefSet: function changeobserver_onContentPrefSet(aGroup, aName, aValue) {
-    Services.console.logStringMessage("content pref setting observed: " + aGroup + ", " + aName + ", " + aValue);
+    gPrefs.reactToChange({host: aGroup, name: aName, value: aValue}, "prefSet");
   },
 
   onContentPrefRemoved: function changeobserver_onContentPrefRemoved(aGroup, aName) {
-    Services.console.logStringMessage("content pref removal observed: " + aGroup + ", " + aName);
+    gPrefs.reactToChange({host: aGroup, name: aName}, "prefRemoved");
   },
 }
 
@@ -761,6 +713,12 @@ var gCookies = {
       (this.tree.view.selection.count >= this.tree.view.rowCount);
   },
 
+  reactToChange: function cookies_reactToChange(aSubject, aState) {
+    // aState: added, changed, deleted
+    aSubject.QueryInterface(Components.interfaces.nsICookie2);
+    Services.console.logStringMessage("cookie change observed: " + aSubject.host + "::" + aSubject.name + ", " + aState);
+  },
+
   forget: function cookies_forget() {
     for (let i = 0; i < this.cookies.length; i++) {
       if (this.cookies[i] &&
@@ -873,6 +831,19 @@ var gPerms = {
         return Services.perms.ALLOW_ACTION;
     }
     return false;
+  },
+
+  reactToChange: function permissions_reactToChange(aSubject, aState) {
+    if (/^hostSaving/.test(aState)) {
+      // aState: hostSavingEnabled, hostSavingDisabled
+      aSubject.QueryInterface(Components.interfaces.nsISupportsString);
+      Services.console.logStringMessage("signon permission change observed: " + aSubject + ", " + aState);
+    }
+    else {
+      // aState: added, changed, deleted
+      aSubject.QueryInterface(Components.interfaces.nsIPermission);
+      Services.console.logStringMessage("permission change observed: " + aSubject.host + "::" + aSubject.type  + ", " + aState);
+    }
   },
 
   forget: function permissions_forget() {
@@ -1121,6 +1092,31 @@ var gPasswords = {
     gLocSvc.clipboard.copyString(password);
   },
 
+  reactToChange: function passwords_reactToChange(aSubject, aState) {
+    // aState: addLogin, modifyLogin, removeLogin, removeAllLogins
+    let data = null;
+    if (aSubject instanceof Components.interfaces.nsIArray) {
+      let dataList = [];
+      let enumerator = aSubject.enumerate();
+      while (enumerator.hasMoreElements()) {
+        let nextElem = enumerator.getNext();
+        nextElem.QueryInterface(Components.interfaces.nsILoginInfo);
+        dataList.push(nextElem.hostname + "|" + nextElem.httpRealm + "|" + nextElem.username);
+      }
+      data = dataList.join("::");
+    }
+    else if (aSubject instanceof Components.interfaces.nsILoginInfo) {
+      data = aSubject.hostname + "|" + aSubject.httpRealm + "|" + aSubject.username;
+    }
+    else if (aSubject instanceof Components.interfaces.nsISupportsString) {
+      data = aSubject.data;
+    }
+    else {
+      data = aSubject;
+    }
+    Services.console.logStringMessage("signon change observed: " + data + ", " + aState);
+  },
+
   forget: function passwords_forget() {
     for (let i = 0; i < this.allSignons.length; i++) {
       if (this.allSignons[i] &&
@@ -1334,6 +1330,16 @@ var gPrefs = {
       this.removeButton.disabled;
     document.getElementById("prefs-context-selectall").disabled =
       (this.tree.view.selection.count >= this.tree.view.rowCount);
+  },
+
+  reactToChange: function prefs_reactToChange(aSubject, aState) {
+    // aState: prefSet, prefRemoved
+    if (aState == "prefSet") {
+      Services.console.logStringMessage("content pref setting observed: " + aSubject.host + ", " + aSubject.name + ", " + aSubject.value);
+    }
+    else if (aState == "prefRemoved") {
+      Services.console.logStringMessage("content pref removal observed: " + aSubject.host + ", " + aSubject.name);
+    }
   },
 
   forget: function prefs_forget() {
@@ -1608,6 +1614,28 @@ var gFormdata = {
       this.removeButton.disabled;
     document.getElementById("fdata-context-selectall").disabled =
       (this.tree.view.selection.count >= this.tree.view.rowCount);
+  },
+
+  reactToChange: function formdata_reactToChange(aSubject, aState) {
+    // aState: addEntry, removeEntry, removeAllEntries
+    let data = null;
+    if (aSubject instanceof Components.interfaces.nsIArray) {
+      let dataList = [];
+      let enumerator = aSubject.enumerate();
+      while (enumerator.hasMoreElements()) {
+        let nextElem = enumerator.getNext();
+        if (nextElem instanceof Components.interfaces.nsISupportsString ||
+            nextElem instanceof Components.interfaces.nsISupportsPRInt64) {
+          dataList.push(nextElem);
+        }
+      }
+      data = dataList.join("|");
+    }
+    else if (aSubject instanceof Components.interfaces.nsISupportsString ||
+          aSubject instanceof Components.interfaces.nsISupportsPRInt64) {
+      data = aSubject;
+    }
+    Services.console.logStringMessage("form data change observed: " + data + ", " + aState);
   },
 
   forget: function formdata_forget() {
