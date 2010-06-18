@@ -124,6 +124,7 @@ var gDomains = {
   displayedDomains: [],
 
   ignoreSelect: false,
+  ignoreUpdate: false,
 
   initialize: function domain_initialize() {
     this.tree = document.getElementById("domainTree");
@@ -137,6 +138,7 @@ var gDomains = {
     gLocSvc.cpref.addObserver(null, gChangeObserver);
     Services.obs.addObserver(gChangeObserver, "satchel-storage-changed", false);
 
+    this.ignoreUpdate = true;
     // global "domain"
     this.domainObjects.push({title: "*",
                              hasPreferences: gLocSvc.cpref.getPrefs(null).enumerator.hasMoreElements(),
@@ -145,7 +147,7 @@ var gDomains = {
     // add domains for all cookies we find
     gCookies.loadList();
     for (let i = 0; i < gCookies.cookies.length; i++) {
-      this._addDomainOrFlag(gCookies.cookies[i].host.replace(/^\./, ""), "hasCookies");
+      this.addDomainOrFlag(gCookies.cookies[i].rawHost, "hasCookies");
     }
 
     // add domains for permissions
@@ -153,19 +155,19 @@ var gDomains = {
     while (enumerator.hasMoreElements()) {
       let nextPermission = enumerator.getNext();
       nextPermission = nextPermission.QueryInterface(Components.interfaces.nsIPermission);
-      this._addDomainOrFlag(nextPermission.host.replace(/^\./, ""), "hasPermissions");
+      this.addDomainOrFlag(nextPermission.host.replace(/^\./, ""), "hasPermissions");
     }
     // add domains for password rejects to permissions
     let rejectHosts = gLocSvc.pwd.getAllDisabledHosts();
     for (let i = 0; i < rejectHosts.length; i++) {
-      this._addDomainOrFlag(rejectHosts[i], "hasPermissions");
+      this.addDomainOrFlag(rejectHosts[i], "hasPermissions");
     }
 
     // add domains for content prefs
     try {
       var statement = gLocSvc.cpref.DBConnection.createStatement("SELECT groups.name AS host FROM groups");
       while (statement.executeStep()) {
-        this._addDomainOrFlag(statement.row["host"], "hasPreferences");
+        this.addDomainOrFlag(statement.row["host"], "hasPreferences");
       }
     }
     finally {
@@ -175,9 +177,10 @@ var gDomains = {
     // add domains for passwords
     gPasswords.loadList();
     for (let i = 0; i < gPasswords.allSignons.length; i++) {
-      this._addDomainOrFlag(gPasswords.allSignons[i].hostname, "hasPasswords");
+      this.addDomainOrFlag(gPasswords.allSignons[i].hostname, "hasPasswords");
     }
 
+    this.ignoreUpdate = false;
     this.search("");
     this.tree.view.selection.select(0);
     gTabs.formdataTab.focus();
@@ -224,19 +227,67 @@ var gDomains = {
     return this.getDomainFromHost(aHostname) == this.selectedDomainName;
   },
 
-  _addDomainOrFlag: function domain__addDomainOrFlag(aHostname, aFlag) {
+  addDomainOrFlag: function domain_addDomainOrFlag(aHostname, aFlag) {
     // for existing domains, add flags, for others, add them to the object
     let domain = this.getDomainFromHost(aHostname);
+    let idx = -1, domAdded = false;
     if (!this.domainObjects.some(
           function(aElement, aIndex, aArray) {
-            if (aElement.title == domain)
+            if (aElement && aElement.title == domain) {
               aArray[aIndex][aFlag] = true;
-            return aElement.title == domain;
+              idx = aIndex;
+            }
+            return aElement && aElement.title == domain;
           })) {
       let domObj = {title: domain};
       domObj[aFlag] = true;
       this.domainObjects.push(domObj);
+      idx = this.domainObjects.length - 1;
+      domAdded = true;
     }
+    if (idx >= 0 && !this.ignoreUpdate) {
+      if (domAdded)
+        this.search(this.searchfield.value);
+      else if (domain == this.selectedDomainName) {
+        this.ignoreUpdate = true;
+        this.select();
+        this.ignoreUpdate = false;
+      }
+    }
+  },
+
+  removeDomainOrFlag: function domain_removeDomainOrFlag(aDomain, aFlag) {
+    // remove a flag from the given domain,
+    // remove the whole domain if it doesn't have any flags left
+    var selectionCache = gDatamanUtils.getSelectedIDs(this.tree, this._getObjID);
+    this.tree.view.selection.clearSelection();
+    let idx = -1;
+    for (let i = 0; i < this.domainObjects.length; i++) {
+      if (this.domainObjects[i] &&
+          this.domainObjects[i].title == aDomain) {
+        idx = i;
+        break;
+      }
+    }
+    this.domainObjects[idx][aFlag] = false
+    if (!this.domainObjects[idx].hasCookies &&
+        !this.domainObjects[idx].hasPermissions &&
+        !this.domainObjects[idx].hasPreferences &&
+        !this.domainObjects[idx].hasPasswords &&
+        !this.domainObjects[idx].hasFormData) {
+      this.domainObjects[idx] = null;
+      this.search(this.searchfield.value);
+    }
+    else {
+      this.ignoreUpdate = true;
+      this.select();
+      this.ignoreUpdate = false;
+    }
+    gDatamanUtils.restoreSelectionFromIDs(this.tree, this._getObjID,
+                                          selectionCache);
+    // make sure we clear the data pane when selection has been removed
+    if (!this.tree.view.selection.count && selectionCache.length)
+      this.select();
   },
 
   select: function domain_select() {
@@ -273,7 +324,8 @@ var gDomains = {
     while (gTabs.tabbox.selectedTab.disabled || gTabs.tabbox.selectedTab.hidden) {
       gTabs.tabbox.tabs.advanceSelectedTab(1, true);
     }
-    gTabs.select();
+    if (!this.ignoreUpdate)
+      gTabs.select();
   },
 
   get selectedDomainObj() {
@@ -503,7 +555,7 @@ var gCookies = {
       this.loadList();
     for (let i = 0; i < this.cookies.length; i++) {
       if (this.cookies[i] &&
-          gDomains.hostMatchesSelected(this.cookies[i].host.replace(/^\./, "")))
+          gDomains.hostMatchesSelected(this.cookies[i].rawHost))
         this.displayedCookies.push(i);
     }
     this.sort(null, false, false);
@@ -704,6 +756,8 @@ var gCookies = {
       gLocSvc.cookie.remove(delCookie.host, delCookie.name, delCookie.path,
                             this.blockOnRemove.checked);
     }
+    if (!this.displayedCookies.length)
+      gDomains.removeDomainOrFlag(gDomains.selectedDomainName, "hasCookies");
   },
 
   updateContext: function cookies_updateContext() {
@@ -716,13 +770,94 @@ var gCookies = {
   reactToChange: function cookies_reactToChange(aSubject, aState) {
     // aState: added, changed, deleted
     aSubject.QueryInterface(Components.interfaces.nsICookie2);
-    Services.console.logStringMessage("cookie change observed: " + aSubject.host + "::" + aSubject.name + ", " + aState);
+    let domain = gDomains.getDomainFromHost(aSubject.rawHost);
+    // Does change affect possibly loaded Cookies pane?
+    let affectsLoaded = this.displayedCookies.length &&
+                        gDomains.hostMatchesSelected(aSubject.rawHost);
+    if (aState == "added") {
+      this.cookies.push({name: aSubject.name,
+                         value: aSubject.value,
+                         isDomain: aSubject.isDomain,
+                         host: aSubject.host,
+                         rawHost: aSubject.rawHost,
+                         path: aSubject.path,
+                         isSecure: aSubject.isSecure,
+                         isSession: aSubject.isSession,
+                         isHttpOnly: aSubject.isHttpOnly,
+                         expires: this._getExpiresString(aSubject.expires),
+                         expiresSortValue: aSubject.expires}
+                       );
+
+      if (affectsLoaded) {
+        this.displayedCookies.push(this.cookies.length - 1);
+        this.tree.treeBoxObject.rowCountChanged(this.cookies.length - 1, 1);
+        this.sort(null, true, false);
+      }
+      else {
+        gDomains.addDomainOrFlag(aSubject.rawHost, "hasCookies");
+      }
+    }
+    else {
+      idx = -1; disp_idx = -1; domainCookies = 0;
+      if (affectsLoaded) {
+        for (let i = 0; i < this.displayedCookies.length; i++) {
+          let cookie = this.cookies[this.displayedCookies[i]];
+          if (cookie && cookie.host == aSubject.host &&
+              cookie.name == aSubject.name && cookie.path == aSubject.path) {
+            idx = this.displayedCookies[i]; disp_idx = i;
+            break;
+          }
+        }
+        if (aState == "deleted")
+          domainCookies = this.displayedCookies.length;
+      }
+      else {
+        for (let i = 0; i < this.cookies.length; i++) {
+          let cookie = this.cookies[i];
+          if (cookie && cookie.host == aSubject.host &&
+              cookie.name == aSubject.name && cookie.path == aSubject.path) {
+            idx = i;
+            if (aState != "removed")
+              break;
+          }
+          if (aState == "deleted" &&
+              gDomains.getDomainFromHost(cookie.rawHost) == domain)
+            domainCookies++;
+        }
+      }
+      if (idx >= 0) {
+        if (aState == "changed") {
+          this.cookies[idx] = {name: aSubject.name,
+                               value: aSubject.value,
+                               isDomain: aSubject.isDomain,
+                               host: aSubject.host,
+                               rawHost: aSubject.rawHost,
+                               path: aSubject.path,
+                               isSecure: aSubject.isSecure,
+                               isSession: aSubject.isSession,
+                               isHttpOnly: aSubject.isHttpOnly,
+                               expires: this._getExpiresString(aSubject.expires),
+                               expiresSortValue: aSubject.expires};
+          if (affectsLoaded)
+            this.tree.treeBoxObject.invalidateRow(disp_idx);
+        }
+        else if (aState == "deleted") {
+          this.cookies[idx] = null;
+          if (affectsLoaded) {
+            this.displayedCookies.splice(disp_idx, 1);
+            this.tree.treeBoxObject.rowCountChanged(disp_idx, -1);
+          }
+          if (domainCookies == 1)
+            gDomains.removeDomainOrFlag(domain, "hasCookies");
+        }
+      }
+    }
   },
 
   forget: function cookies_forget() {
     for (let i = 0; i < this.cookies.length; i++) {
       if (this.cookies[i] &&
-          gDomains.hostMatchesSelected(this.cookies[i].host.replace(/^\./, ""))) {
+          gDomains.hostMatchesSelected(this.cookies[i].rawHost)) {
         gLocSvc.cookie.remove(this.cookies[i].host, this.cookies[i].name,
                               this.cookies[i].path, false);
         this.cookies[i] = null;
