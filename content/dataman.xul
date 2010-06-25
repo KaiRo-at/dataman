@@ -155,6 +155,7 @@
                oncommand="gDomains.search(this.value);"/>
       <tree id="domainTree" flex="1"
             seltype="single"
+            onkeypress="gDomains.handleKeyPress(event)"
             onselect="gDomains.select();"
             context="domainTreeContextMenu">
         <treecols>

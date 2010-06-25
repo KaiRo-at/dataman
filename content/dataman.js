@@ -342,6 +342,12 @@ var gDomains = {
     return this.domainObjects[this.displayedDomains[this.tree.currentIndex]].title;
   },
 
+  handleKeyPress: function domain_handleKeyPress(aEvent) {
+    if (aEvent.keyCode == KeyEvent.DOM_VK_DELETE) {
+      this.forget();
+    }
+  },
+
   sort: function domain_sort() {
     // Compare function for two domain items
     let compfunc = function domain_sort_compare(aOne, aTwo) {
