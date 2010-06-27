@@ -774,7 +774,13 @@ var gCookies = {
   },
 
   reactToChange: function cookies_reactToChange(aSubject, aState) {
-    // aState: added, changed, deleted
+    // aState: added, changed, deleted, batch-deleted, cleared, reload
+    // see http://mxr.mozilla.org/mozilla-central/source/netwerk/cookie/nsICookieService.idl
+    if (aState == "batch-deleted" || aState == "cleared" || aState == "reload") {
+      // XXX: missing implementation here right now
+      Services.console.logStringMessage("unsupported cookie change observed: " +aState);
+      return;
+    }
     aSubject.QueryInterface(Components.interfaces.nsICookie2);
     let domain = gDomains.getDomainFromHost(aSubject.rawHost);
     // Does change affect possibly loaded Cookies pane?
