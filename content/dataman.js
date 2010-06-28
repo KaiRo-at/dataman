@@ -290,6 +290,41 @@ var gDomains = {
       this.select();
   },
 
+  resetFlagToDomains: function domain_resetFlagToDomains(aFlag, aDomainList) {
+    // Reset a flag to be only set on a specific set of domains,
+    // purging then-emtpy domain in the process.
+    // Needed when we need to reload a complete set of items.
+    var selectionCache = gDatamanUtils.getSelectedIDs(this.tree, this._getObjID);
+    this.tree.view.selection.clearSelection();
+    // First, clear all domains of this flag.
+    for (let i = 0; i < this.domainObjects.length; i++) {
+      this.domainObjects[i][aFlag] = false;
+    }
+    // Then, set it again on all domains in the new list.
+    for (let i = 0; i < this.aDomainList.length; i++) {
+      this.addDomainOrFlag(this.aDomainList[i], aFlag);
+    }
+    // Now, purge all empty doamins.
+    for (let i = 0; i < this.domainObjects.length; i++) {
+      if (!this.domainObjects[i].hasCookies &&
+          !this.domainObjects[i].hasPermissions &&
+          !this.domainObjects[i].hasPreferences &&
+          !this.domainObjects[i].hasPasswords &&
+          !this.domainObjects[i].hasFormData) {
+        this.domainObjects[i] = null;
+      }
+    }
+    this.search(this.searchfield.value);
+    this.ignoreUpdate = true;
+    this.select();
+    this.ignoreUpdate = false;
+    gDatamanUtils.restoreSelectionFromIDs(this.tree, this._getObjID,
+                                          selectionCache);
+    // make sure we clear the data pane when selection has been removed
+    if (!this.tree.view.selection.count && selectionCache.length)
+      this.select();
+  },
+
   select: function domain_select() {
     if (this.ignoreSelect)
       return;
@@ -777,10 +812,39 @@ var gCookies = {
     // aState: added, changed, deleted, batch-deleted, cleared, reload
     // see http://mxr.mozilla.org/mozilla-central/source/netwerk/cookie/nsICookieService.idl
     if (aState == "batch-deleted" || aState == "cleared" || aState == "reload") {
-      // XXX: missing implementation here right now
-      Services.console.logStringMessage("unsupported cookie change observed: " +aState);
+      // Go for re-parsing the whole thing, as cleared and reload need that anyhow
+      // (batch-deleted has an nsIArray of cookies, we could in theory do better there)
+      var selectionCache = [];
+      if (this.displayedCookies.length) {
+        selectionCache = gDatamanUtils.getSelectedIDs(this.tree, this._getObjID);
+        this.displayedCookies = [];
+      }
+      var domainList = [];
+      for (let i = 0; i < gCookies.cookies.length; i++) {
+        let domain = gDomains.getDomainFromHost(gCookies.cookies[i].rawHost);
+        if (!domainList.indexOf(domain) != -1)
+          domainList.push(domain);
+      }
+      gDomains.resetFlagToDomains("hasCookies", domainList);
+      // Restore the local panel display if needed
+      if (gTabs.activePanel == "cookiesPanel" &&
+          gDomains.selectedDomainObj.hasCookies) {
+        this.tree.treeBoxObject.beginUpdateBatch();
+        for (let i = 0; i < this.cookies.length; i++) {
+          if (this.cookies[i] &&
+              gDomains.hostMatchesSelected(this.cookies[i].rawHost))
+            this.displayedCookies.push(i);
+        }
+        this.sort(null, false, false);
+        this.tree.treeBoxObject.endUpdateBatch();
+        this.tree.treeBoxObject.invalidate();
+        gDatamanUtils.restoreSelectionFromIDs(this.tree, this._getObjID,
+                                              selectionCache);
+      }
       return;
     }
+
+    // Usual notifications for added, changed, deleted - do "surgical" updates.
     aSubject.QueryInterface(Components.interfaces.nsICookie2);
     let domain = gDomains.getDomainFromHost(aSubject.rawHost);
     // Does change affect possibly loaded Cookies pane?
