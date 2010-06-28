@@ -820,8 +820,8 @@ var gCookies = {
         this.displayedCookies = [];
       }
       var domainList = [];
-      for (let i = 0; i < gCookies.cookies.length; i++) {
-        let domain = gDomains.getDomainFromHost(gCookies.cookies[i].rawHost);
+      for (let i = 0; i < this.cookies.length; i++) {
+        let domain = gDomains.getDomainFromHost(this.cookies[i].rawHost);
         if (!domainList.indexOf(domain) != -1)
           domainList.push(domain);
       }
@@ -893,7 +893,7 @@ var gCookies = {
           if (cookie && cookie.host == aSubject.host &&
               cookie.name == aSubject.name && cookie.path == aSubject.path) {
             idx = i;
-            if (aState != "removed")
+            if (aState != "deleted")
               break;
           }
           if (aState == "deleted" &&
@@ -1305,27 +1305,106 @@ var gPasswords = {
 
   reactToChange: function passwords_reactToChange(aSubject, aState) {
     // aState: addLogin, modifyLogin, removeLogin, removeAllLogins
-    let data = null;
-    if (aSubject instanceof Components.interfaces.nsIArray) {
-      let dataList = [];
-      let enumerator = aSubject.enumerate();
-      while (enumerator.hasMoreElements()) {
-        let nextElem = enumerator.getNext();
-        nextElem.QueryInterface(Components.interfaces.nsILoginInfo);
-        dataList.push(nextElem.hostname + "|" + nextElem.httpRealm + "|" + nextElem.username);
+    if (aState == "removeAllLogins") {
+      // Go for re-parsing the whole thing
+      if (this.displayedSignons.length) {
+        this.tree.view.selection.clearSelection();
+        this.tree.treeBoxObject.beginUpdateBatch();
+        this.displayedSignons = [];
+        this.tree.treeBoxObject.endUpdateBatch();
+        this.tree.treeBoxObject.invalidate();
       }
-      data = dataList.join("::");
+      this.loadList();
+      let domainList = [];
+      for (let i = 0; i < this.allSignons.length; i++) {
+        let domain = gDomains.getDomainFromHost(this.allSignons[i].hostname);
+        if (!domainList.indexOf(domain) != -1)
+          domainList.push(domain);
+      }
+      gDomains.resetFlagToDomains("hasPasswords", domainList);
+      return;
+    }
+
+    // Usual notifications for addLogin, modifyLogin, removeLogin - do "surgical" updates.
+    let curLogin = null, oldLogin = null;
+    if (aState == "modifyLogin" &&
+        aSubject instanceof Components.interfaces.nsIArray) {
+      let enumerator = aSubject.enumerate();
+      if (enumerator.hasMoreElements()) {
+        oldLogin = enumerator.getNext();
+        oldLogin.QueryInterface(Components.interfaces.nsILoginInfo);
+      }
+      if (enumerator.hasMoreElements()) {
+        curLogin = enumerator.getNext();
+        curLogin.QueryInterface(Components.interfaces.nsILoginInfo);
+      }
     }
     else if (aSubject instanceof Components.interfaces.nsILoginInfo) {
-      data = aSubject.hostname + "|" + aSubject.httpRealm + "|" + aSubject.username;
-    }
-    else if (aSubject instanceof Components.interfaces.nsISupportsString) {
-      data = aSubject.data;
+      curLogin = aSubject; oldLogin = aSubject;
     }
     else {
-      data = aSubject;
+      Components.utils.reportError("Observed an unrecognized signon change of type " + aState);
     }
-    Services.console.logStringMessage("signon change observed: " + data + ", " + aState);
+
+    let domain = gDomains.getDomainFromHost(curLogin.hostname);
+    // Does change affect possibly loaded Passwords pane?
+    let affectsLoaded = this.displayedSignons.length &&
+                        gDomains.hostMatchesSelected(curLogin.hostname);
+    if (aState == "addLogin") {
+      this.allSignons.push(curLogin);
+
+      if (affectsLoaded) {
+        this.displayedSignons.push(this.allSignons.length - 1);
+        this.tree.treeBoxObject.rowCountChanged(this.allSignons.length - 1, 1);
+        this.sort(null, true, false);
+      }
+      else {
+        gDomains.addDomainOrFlag(curLogin.hostname, "hasPasswords");
+      }
+    }
+    else {
+      idx = -1; disp_idx = -1; domainPasswords = 0;
+      if (affectsLoaded) {
+        for (let i = 0; i < this.displayedSignons.length; i++) {
+          let signon = this.allSignons[this.displayedSignons[i]];
+          if (signon && signon.equals(oldLogin)) {
+            idx = this.displayedSignons[i]; disp_idx = i;
+            break;
+          }
+        }
+        if (aState == "removeLogin")
+          domainPasswords = this.displayedSignons.length;
+      }
+      else {
+        for (let i = 0; i < this.allSignons.length; i++) {
+          let signon = this.allSignons[i];
+          if (signon && signon.equals(oldLogin)) {
+            idx = i;
+            if (aState != "removeLogin")
+              break;
+          }
+          if (aState == "removeLogin" &&
+              gDomains.getDomainFromHost(oldLogin.hostname) == domain)
+            domainPasswords++;
+        }
+      }
+      if (idx >= 0) {
+        if (aState == "modifyLogin") {
+          this.allSignons[idx] = curLogin;
+          if (affectsLoaded)
+            this.tree.treeBoxObject.invalidateRow(disp_idx);
+        }
+        else if (aState == "removeLogin") {
+          this.allSignons[idx] = null;
+          if (affectsLoaded) {
+            this.displayedSignons.splice(disp_idx, 1);
+            this.tree.treeBoxObject.rowCountChanged(disp_idx, -1);
+          }
+          if (domainCookies == 1)
+            gDomains.removeDomainOrFlag(domain, "hasPasswords");
+        }
+      }
+    }
   },
 
   forget: function passwords_forget() {
