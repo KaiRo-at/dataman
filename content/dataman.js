@@ -617,19 +617,22 @@ var gCookies = {
       let nextCookie = enumerator.getNext();
       if (!nextCookie) break;
       nextCookie = nextCookie.QueryInterface(Components.interfaces.nsICookie2);
-      this.cookies.push({name: nextCookie.name,
-                         value: nextCookie.value,
-                         isDomain: nextCookie.isDomain,
-                         host: nextCookie.host,
-                         rawHost: nextCookie.rawHost,
-                         path: nextCookie.path,
-                         isSecure: nextCookie.isSecure,
-                         isSession: nextCookie.isSession,
-                         isHttpOnly: nextCookie.isHttpOnly,
-                         expires: this._getExpiresString(nextCookie.expires),
-                         expiresSortValue: nextCookie.expires}
-                       );
+      this.cookies.push(this._makeCookieObject(nextCookie));
     }
+  },
+
+  _makeCookieObject: function cookies__makeCookieObject(aCookie) {
+      return {name: aCookie.name,
+              value: aCookie.value,
+              isDomain: aCookie.isDomain,
+              host: aCookie.host,
+              rawHost: aCookie.rawHost,
+              path: aCookie.path,
+              isSecure: aCookie.isSecure,
+              isSession: aCookie.isSession,
+              isHttpOnly: aCookie.isHttpOnly,
+              expires: this._getExpiresString(aCookie.expires),
+              expiresSortValue: aCookie.expires};
   },
 
   _getObjID: function cookies__getObjID(aIdx) {
@@ -819,6 +822,7 @@ var gCookies = {
         selectionCache = gDatamanUtils.getSelectedIDs(this.tree, this._getObjID);
         this.displayedCookies = [];
       }
+      this.loadList();
       var domainList = [];
       for (let i = 0; i < this.cookies.length; i++) {
         let domain = gDomains.getDomainFromHost(this.cookies[i].rawHost);
@@ -851,19 +855,7 @@ var gCookies = {
     let affectsLoaded = this.displayedCookies.length &&
                         gDomains.hostMatchesSelected(aSubject.rawHost);
     if (aState == "added") {
-      this.cookies.push({name: aSubject.name,
-                         value: aSubject.value,
-                         isDomain: aSubject.isDomain,
-                         host: aSubject.host,
-                         rawHost: aSubject.rawHost,
-                         path: aSubject.path,
-                         isSecure: aSubject.isSecure,
-                         isSession: aSubject.isSession,
-                         isHttpOnly: aSubject.isHttpOnly,
-                         expires: this._getExpiresString(aSubject.expires),
-                         expiresSortValue: aSubject.expires}
-                       );
-
+      this.cookies.push(this._makeCookieObject(aSubject));
       if (affectsLoaded) {
         this.displayedCookies.push(this.cookies.length - 1);
         this.tree.treeBoxObject.rowCountChanged(this.cookies.length - 1, 1);
@@ -903,17 +895,7 @@ var gCookies = {
       }
       if (idx >= 0) {
         if (aState == "changed") {
-          this.cookies[idx] = {name: aSubject.name,
-                               value: aSubject.value,
-                               isDomain: aSubject.isDomain,
-                               host: aSubject.host,
-                               rawHost: aSubject.rawHost,
-                               path: aSubject.path,
-                               isSecure: aSubject.isSecure,
-                               isSession: aSubject.isSession,
-                               isHttpOnly: aSubject.isHttpOnly,
-                               expires: this._getExpiresString(aSubject.expires),
-                               expiresSortValue: aSubject.expires};
+          this.cookies[idx] = this._makeCookieObject(aSubject);
           if (affectsLoaded)
             this.tree.treeBoxObject.invalidateRow(disp_idx);
         }
