@@ -294,6 +294,7 @@ var gDomains = {
     // Reset a flag to be only set on a specific set of domains,
     // purging then-emtpy domain in the process.
     // Needed when we need to reload a complete set of items.
+    this.ignoreSelect = true;
     var selectionCache = gDatamanUtils.getSelectedIDs(this.tree, this._getObjID);
     this.tree.view.selection.clearSelection();
     // First, clear all domains of this flag.
@@ -301,8 +302,8 @@ var gDomains = {
       this.domainObjects[i][aFlag] = false;
     }
     // Then, set it again on all domains in the new list.
-    for (let i = 0; i < this.aDomainList.length; i++) {
-      this.addDomainOrFlag(this.aDomainList[i], aFlag);
+    for (let i = 0; i < aDomainList.length; i++) {
+      this.addDomainOrFlag(aDomainList[i], aFlag);
     }
     // Now, purge all empty doamins.
     for (let i = 0; i < this.domainObjects.length; i++) {
@@ -315,11 +316,11 @@ var gDomains = {
       }
     }
     this.search(this.searchfield.value);
+    this.ignoreSelect = false;
     this.ignoreUpdate = true;
-    this.select();
-    this.ignoreUpdate = false;
     gDatamanUtils.restoreSelectionFromIDs(this.tree, this._getObjID,
                                           selectionCache);
+    this.ignoreUpdate = false;
     // make sure we clear the data pane when selection has been removed
     if (!this.tree.view.selection.count && selectionCache.length)
       this.select();
@@ -356,8 +357,13 @@ var gDomains = {
     gTabs.formdataTab.hidden = !selectedDomain.hasFormData;
     gTabs.formdataTab.disabled = !selectedDomain.hasFormData;
     gTabs.forgetTab.hidden = true;
-    while (gTabs.tabbox.selectedTab.disabled || gTabs.tabbox.selectedTab.hidden) {
+    let prevtab = gTabs.tabbox.selectedTab || gTabs.cookiesTab;
+    let stoptab = null;
+    while (gTabs.tabbox.selectedTab != stoptab &&
+           (gTabs.tabbox.selectedTab.disabled || gTabs.tabbox.selectedTab.hidden)) {
       gTabs.tabbox.tabs.advanceSelectedTab(1, true);
+      if (!stoptab)
+        stoptab = prevtab;
     }
     if (!this.ignoreUpdate)
       gTabs.select();
@@ -826,7 +832,7 @@ var gCookies = {
       var domainList = [];
       for (let i = 0; i < this.cookies.length; i++) {
         let domain = gDomains.getDomainFromHost(this.cookies[i].rawHost);
-        if (!domainList.indexOf(domain) != -1)
+        if (domainList.indexOf(domain) == -1)
           domainList.push(domain);
       }
       gDomains.resetFlagToDomains("hasCookies", domainList);
@@ -1300,7 +1306,7 @@ var gPasswords = {
       let domainList = [];
       for (let i = 0; i < this.allSignons.length; i++) {
         let domain = gDomains.getDomainFromHost(this.allSignons[i].hostname);
-        if (!domainList.indexOf(domain) != -1)
+        if (domainList.indexOf(domain) == -1)
           domainList.push(domain);
       }
       gDomains.resetFlagToDomains("hasPasswords", domainList);
