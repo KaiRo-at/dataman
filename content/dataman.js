@@ -1700,26 +1700,8 @@ var gFormdata = {
     this.searchfield = document.getElementById("fdataSearch");
     this.removeButton = document.getElementById("fdataRemove");
 
-    if (!this.formdata.length) {
-      try {
-        let sql = "SELECT fieldname, value, timesUsed, firstUsed, lastUsed, guid FROM moz_formhistory";
-        var statement = gLocSvc.fhist.DBConnection.createStatement(sql);
-        while (statement.executeStep()) {
-          this.formdata.push({fieldname: statement.row["fieldname"],
-                              value: statement.row["value"],
-                              timesUsed: statement.row["timesUsed"],
-                              firstUsed: this._getTimeString(statement.row["firstUsed"]),
-                              firstUsedSortValue: statement.row["firstUsed"],
-                              lastUsed: this._getTimeString(statement.row["lastUsed"]),
-                              lastUsedSortValue: statement.row["lastUsed"],
-                              guid: statement.row["guid"]}
-                            );
-        }
-      }
-      finally {
-        statement.reset();
-      }
-    }
+    // Always load fresh list, no need to react to changes when pane not open.
+    this.loadList();
     this.search("");
   },
 
@@ -1727,6 +1709,28 @@ var gFormdata = {
     this.tree.view.selection.clearSelection();
     this.tree.view = null;
     this.displayedFormdata = [];
+  },
+
+  loadList: function formdata_loadList() {
+    this.formdata = [];
+    try {
+      let sql = "SELECT fieldname, value, timesUsed, firstUsed, lastUsed, guid FROM moz_formhistory";
+      var statement = gLocSvc.fhist.DBConnection.createStatement(sql);
+      while (statement.executeStep()) {
+        this.formdata.push({fieldname: statement.row["fieldname"],
+                            value: statement.row["value"],
+                            timesUsed: statement.row["timesUsed"],
+                            firstUsed: this._getTimeString(statement.row["firstUsed"]),
+                            firstUsedSortValue: statement.row["firstUsed"],
+                            lastUsed: this._getTimeString(statement.row["lastUsed"]),
+                            lastUsedSortValue: statement.row["lastUsed"],
+                            guid: statement.row["guid"]}
+                          );
+      }
+    }
+    finally {
+      statement.reset();
+    }
   },
 
   _getTimeString: function formdata__getTimeString(aTimestamp) {
@@ -1895,25 +1899,102 @@ var gFormdata = {
   },
 
   reactToChange: function formdata_reactToChange(aSubject, aState) {
-    // aState: addEntry, removeEntry, removeAllEntries
-    let data = null;
+    // aState: addEntry, modifyEntry, removeEntry, removeAllEntries,
+    // removeEntriesForName, removeEntriesByTimeframe, expireOldEntries,
+    // before-removeEntry, before-removeAllEntries, before-removeEntriesForName,
+    // before-removeEntriesByTimeframe, before-expireOldEntries
+
+    // Ignore changes when no form data pane is loaded
+    // or if we caught a before-* notification.
+    if (!this.displayedFormdata.length || /^before-/.test(aState))
+      return;
+
+    if (aState == "removeAllEntries" || aState == "removeEntriesForName" ||
+        aState == "removeEntriesByTimeframe" || aState == "expireOldEntries") {
+      // Go for re-parsing the whole thing
+      this.tree.view.selection.clearSelection();
+      this.tree.treeBoxObject.beginUpdateBatch();
+      this.displayedFormdata = [];
+      this.tree.treeBoxObject.endUpdateBatch();
+      this.tree.treeBoxObject.invalidate();
+
+      this.loadList();
+      this.search("");
+      return;
+    }
+
+    // Usual notifications for addEntry, modifyEntry, removeEntry - do "surgical" updates.
+    let subjectData = []; // those notifications all have: name, value, guid
     if (aSubject instanceof Components.interfaces.nsIArray) {
-      let dataList = [];
       let enumerator = aSubject.enumerate();
       while (enumerator.hasMoreElements()) {
         let nextElem = enumerator.getNext();
         if (nextElem instanceof Components.interfaces.nsISupportsString ||
             nextElem instanceof Components.interfaces.nsISupportsPRInt64) {
-          dataList.push(nextElem);
+          subjectData.push(nextElem);
         }
       }
-      data = dataList.join("|");
     }
-    else if (aSubject instanceof Components.interfaces.nsISupportsString ||
-          aSubject instanceof Components.interfaces.nsISupportsPRInt64) {
-      data = aSubject;
+    else {
+      Components.utils.reportError("Observed an unrecognized formdata change of type " + aState);
+      return;
     }
-    Services.console.logStringMessage("form data change observed: " + data + ", " + aState);
+
+    let entryData = null;
+    if (aState == "addEntry" || aState == "modifyEntry") {
+      try {
+        let sql = "SELECT fieldname, value, timesUsed, firstUsed, lastUsed, guid FROM moz_formhistory WHERE guid=:guid";
+        var statement = gLocSvc.fhist.DBConnection.createStatement(sql);
+        statement.params.guid = subjectData[2];
+        while (statement.executeStep()) {
+          entryData = {fieldname: statement.row["fieldname"],
+                       value: statement.row["value"],
+                       timesUsed: statement.row["timesUsed"],
+                       firstUsed: this._getTimeString(statement.row["firstUsed"]),
+                       firstUsedSortValue: statement.row["firstUsed"],
+                       lastUsed: this._getTimeString(statement.row["lastUsed"]),
+                       lastUsedSortValue: statement.row["lastUsed"],
+                       guid: statement.row["guid"]};
+        }
+      }
+      finally {
+        statement.reset();
+      }
+
+      if (!entryData) {
+        Components.utils.reportError("Could not find added/modifed formdata entry");
+        return;
+      }
+    }
+
+    if (aState == "addEntry") {
+      this.formdata.push(entryData);
+
+      this.displayedFormdata.push(this.formdata.length - 1);
+      this.tree.treeBoxObject.rowCountChanged(this.formdata.length - 1, 1);
+      this.search("");
+    }
+    else {
+      idx = -1; disp_idx = -1;
+      for (let i = 0; i < this.displayedFormdata.length; i++) {
+        let fdata = this.formdata[this.displayedFormdata[i]];
+        if (fdata && fdata.guid == subjectData[2]) {
+          idx = this.displayedFormdata[i]; disp_idx = i;
+          break;
+        }
+      }
+      if (idx >= 0) {
+        if (aState == "modifyEntry") {
+          this.formdata[idx] = entryData;
+          this.tree.treeBoxObject.invalidateRow(disp_idx);
+        }
+        else if (aState == "removeEntry") {
+          this.formdata[idx] = null;
+          this.displayedFormdata.splice(disp_idx, 1);
+          this.tree.treeBoxObject.rowCountChanged(disp_idx, -1);
+        }
+      }
+    }
   },
 
   forget: function formdata_forget() {
