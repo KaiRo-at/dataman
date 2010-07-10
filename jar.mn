@@ -6,6 +6,8 @@ dataman.jar:
 % locale  dataman  @AB_CD@ %locale/@AB_CD@/dataman/
 % overlay chrome://browser/content/browser.xul chrome://dataman/content/fxOverlay.xul application={ec8030f7-c20a-464f-9b0e-13a3a9e97384}
 % overlay chrome://communicator/content/tasksOverlay.xul chrome://dataman/content/smOverlay.xul application={92650c4d-4b8e-4d2a-b7eb-24ecf4f6b63a}
+% component {7a02e7fe-b32c-40ea-a790-246ca49b6061} components/aboutData.js
+% contract @mozilla.org/network/protocol/about;1?what=data {7a02e7fe-b32c-40ea-a790-246ca49b6061}
   content/dataman/dataman.css               (content/dataman.css)
   content/dataman/dataman.js                (content/dataman.js)
   content/dataman/dataman.xml               (content/dataman.xml)

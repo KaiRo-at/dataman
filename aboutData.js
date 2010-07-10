@@ -57,6 +57,11 @@ AboutData.prototype = {
   }
 };
 
-function NSGetModule(compMgr, fileSpec) {
-  return XPCOMUtils.generateModule([AboutData]);
-}
+/**
+ * XPCOMUtils.generateNSGetFactory was introduced in Mozilla 2.
+ * XPCOMUtils.generateNSGetModule is for Mozilla 1.9.x.
+ */
+if (XPCOMUtils.generateNSGetFactory)
+  var NSGetFactory = XPCOMUtils.generateNSGetFactory([AboutData]);
+else
+  var NSGetModule = XPCOMUtils.generateNSGetModule([AboutData]);

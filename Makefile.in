@@ -50,6 +50,7 @@ EXTENSION_VERSION      = 0.9
 XPI_NAME               = dataman
 USE_EXTENSION_MANIFEST = 1
 NO_JAR_AUTO_REG        = 1
+NO_JS_MANIFEST         = 1
 INSTALL_EXTENSION_ID   = dataman@kairo.at
 XPI_PKGNAME            = dataman-$(EXTENSION_VERSION)
 

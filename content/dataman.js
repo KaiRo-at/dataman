@@ -1945,7 +1945,7 @@ var gFormdata = {
       try {
         let sql = "SELECT fieldname, value, timesUsed, firstUsed, lastUsed, guid FROM moz_formhistory WHERE guid=:guid";
         var statement = gLocSvc.fhist.DBConnection.createStatement(sql);
-        statement.params.guid = subjectData[2];
+        statement.params.guid = subjectData[2].toString();
         while (statement.executeStep()) {
           entryData = {fieldname: statement.row["fieldname"],
                        value: statement.row["value"],
