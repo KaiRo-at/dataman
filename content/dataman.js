@@ -38,8 +38,8 @@
 Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
 Components.utils.import("resource://gre/modules/Services.jsm");
 
-window.addEventListener("load",  initialize, false);
-window.addEventListener("unload",  shutdown, false);
+window.addEventListener("load", initialize, false);
+window.addEventListener("unload", shutdown, false);
 
 // locally loaded services
 var gLocSvc = {};
@@ -81,6 +81,16 @@ function shutdown() {
 }
 
 var gChangeObserver = {
+  interfaces: [Components.interfaces.nsIObserver,
+               Components.interfaces.nsIContentPrefObserver,
+               Components.interfaces.nsISupports],
+
+  QueryInterface: function ContentPrefTest_QueryInterface(iid) {
+    if (!this.interfaces.some( function(v) { return iid.equals(v) } ))
+      throw Components.results.NS_ERROR_NO_INTERFACE;
+    return this;
+  },
+
   observe: function changeobserver_observe(aSubject, aTopic, aState) {
     switch (aTopic) {
       case "cookie-changed":
@@ -1036,7 +1046,6 @@ var gPerms = {
     if (/^hostSaving/.test(aState)) {
       // aState: hostSavingEnabled, hostSavingDisabled
       aSubject.QueryInterface(Components.interfaces.nsISupportsString);
-      Services.console.logStringMessage("signon permission change observed: " + aSubject.data + ", " + aState);
       let domain = gDomains.getDomainFromHost(aSubject.data);
       // Does change affect possibly loaded Preferences pane?
       let affectsLoaded = this.list.childElementCount &&
