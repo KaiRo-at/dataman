@@ -110,6 +110,9 @@
       <method name="useDefault">
         <parameter name="aChecked"/>
         <body><![CDATA[
+          let checkbox = document.getAnonymousElementByAttribute(this, "anonid", "useDefault");
+          if (checkbox.checked != aChecked)
+            checkbox.checked = aChecked;
           let radioGroup = document.getAnonymousElementByAttribute(this, "anonid", "radioGroup");
           radioGroup.disabled = aChecked;
           if (aChecked) {
@@ -123,6 +126,10 @@
       <method name="setCapability">
         <parameter name="aValue"/>
         <body><![CDATA[
+          this.capability = aValue;
+          let radio = document.getAnonymousElementByAttribute(this, "anonid", "permSetting-" + aValue);
+          if (!radio.selected)
+            radio.radioGroup.selectedItem = radio;
           if (this.type == "password")
             gLocSvc.pwd.setLoginSavingEnabled(this.host, aValue == Services.perms.ALLOW_ACTION);
           else

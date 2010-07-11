@@ -973,7 +973,7 @@ var gPerms = {
       if (gDomains.hostMatchesSelected(host.replace(/^\./, ""))) {
         let permElem = document.createElement("richlistitem");
         permElem.setAttribute("type", nextPermission.type);
-        permElem.setAttribute("host", nextPermission.host);
+        permElem.setAttribute("host", host);
         permElem.setAttribute("rawHost", (host.charAt(0) == ".") ? host.substring(1, host.length) : host);
         permElem.setAttribute("capability", nextPermission.capability);
         permElem.setAttribute("class", "permission");
@@ -1036,12 +1036,125 @@ var gPerms = {
     if (/^hostSaving/.test(aState)) {
       // aState: hostSavingEnabled, hostSavingDisabled
       aSubject.QueryInterface(Components.interfaces.nsISupportsString);
-      Services.console.logStringMessage("signon permission change observed: " + aSubject + ", " + aState);
+      let domain = gDomains.getDomainFromHost(aSubject);
+      // Does change affect possibly loaded Preferences pane?
+      let affectsLoaded = this.list.childElementCount &&
+                          gDomains.hostMatchesSelected(aSubject);
+      let permElem = null;
+      if (affectsLoaded) {
+        for (let i = 0; i < this.list.children.length; i++) {
+          let elem = this.list.children[i];
+          if (elem.getAttribute("host") == aSubject &&
+              elem.getAttribute("type") == "password")
+            permElem = elem;
+        }
+      }
+      if (aState == "hostSavingEnabled") {
+        if (affectsLoaded) {
+          permElem.setCapability(Services.perms.ALLOW_ACTION);
+        }
+        else {
+          // Only remove if domain is not shown, note that this may leave an empty domain.
+          let haveDomainPerms = false;
+          let enumerator = Services.perms.enumerator;
+          while (enumerator.hasMoreElements()) {
+            let nextPermission = enumerator.getNext();
+            nextPermission = nextPermission.QueryInterface(Components.interfaces.nsIPermission);
+            if (domain == gDomains.getDomainFromHost(nextPermission.host.replace(/^\./, ""))
+              haveDomainPerms = true;
+          }
+          let rejectHosts = gLocSvc.pwd.getAllDisabledHosts();
+          for (let i = 0; i < rejectHosts.length; i++) {
+            if (domain == gDomains.getDomainFromHost(rejectHosts[i]))
+              haveDomainPerms = true;
+          }
+          if (!haveDomainPerms)
+            gDomains.removeDomainOrFlag(domain, "hasPermissions");
+        }
+      }
+      else if (aState == "hostSavingDisabled") {
+        if (affectsLoaded) {
+          if (permElem) {
+            permElem.setCapability(Services.perms.DENY_ACTION);
+          }
+          else {
+            permElem = document.createElement("richlistitem");
+            permElem.setAttribute("type", "password");
+            permElem.setAttribute("host", aSubject);
+            permElem.setAttribute("rawHost", domain);
+            permElem.setAttribute("capability", 2);
+            permElem.setAttribute("class", "permission");
+            permElem.setAttribute("orient", "vertical");
+            this.list.appendChild(permElem);
+          }
+        }
+        else {
+          gDomains.addDomainOrFlag(aSubject, "hasPermissions");
+        }
+      }
     }
     else {
-      // aState: added, changed, deleted
+      // aState: added, changed, deleted, cleared
+      // See http://mxr.mozilla.org/mozilla-central/source/netwerk/base/public/nsIPermissionManager.idl
+      if (aState == "cleared") {
+        gDomains.resetFlagToDomains("hasPermissions", []);
+        return;
+      }
       aSubject.QueryInterface(Components.interfaces.nsIPermission);
-      Services.console.logStringMessage("permission change observed: " + aSubject.host + "::" + aSubject.type  + ", " + aState);
+      let domain = gDomains.getDomainFromHost(aSubject.host);
+      // Does change affect possibly loaded Preferences pane?
+      let affectsLoaded = this.list.childElementCount &&
+                          gDomains.hostMatchesSelected(aSubject.host);
+      let permElem = null;
+      if (affectsLoaded) {
+        for (let i = 0; i < this.list.children.length; i++) {
+          let elem = this.list.children[i];
+          if (elem.getAttribute("host") == aSubject.host &&
+              elem.getAttribute("type") == aSubject.type)
+            permElem = elem;
+        }
+      }
+      if (aState == "deleted") {
+        if (affectsLoaded) {
+          permElem.useDefault(true);
+        }
+        else {
+          // Only remove if domain is not shown, note that this may leave an empty domain.
+          let haveDomainPerms = false;
+          let enumerator = Services.perms.enumerator;
+          while (enumerator.hasMoreElements()) {
+            let nextPermission = enumerator.getNext();
+            nextPermission = nextPermission.QueryInterface(Components.interfaces.nsIPermission);
+            if (domain == gDomains.getDomainFromHost(nextPermission.host.replace(/^\./, ""))
+              haveDomainPerms = true;
+          }
+          let rejectHosts = gLocSvc.pwd.getAllDisabledHosts();
+          for (let i = 0; i < rejectHosts.length; i++) {
+            if (domain == gDomains.getDomainFromHost(rejectHosts[i]))
+              haveDomainPerms = true;
+          }
+          if (!haveDomainPerms)
+            gDomains.removeDomainOrFlag(domain, "hasPermissions");
+        }
+      }
+      else if (aState == "changed" && affectsLoaded) {
+        permElem.setCapability(aSubject.capability);
+      }
+      else if (aState == "added") {
+        if (affectsLoaded) {
+          permElem = document.createElement("richlistitem");
+          permElem.setAttribute("type", aSubject.type);
+          permElem.setAttribute("host", aSubject.host);
+          permElem.setAttribute("rawHost", (aSubject.host.charAt(0) == ".") ? aSubject.host.substring(1, aSubject.host.length) : host);
+          permElem.setAttribute("capability", aSubject.capability);
+          permElem.setAttribute("class", "permission");
+          permElem.setAttribute("orient", "vertical");
+          this.list.appendChild(permElem);
+        }
+        else {
+          gDomains.addDomainOrFlag(aSubject.host, "hasPermissions");
+        }
+      }
     }
   },
 
@@ -1451,18 +1564,18 @@ var gPrefs = {
     this.removeButton = document.getElementById("prefsRemove");
 
     this.tree.treeBoxObject.beginUpdateBatch();
-    try {
-      // get all groups (hosts) that match the domain
-      let domain = gDomains.selectedDomainName;
-      if (domain == "*") {
-        let enumerator =  gLocSvc.cpref.getPrefs(null).enumerator;
-        while (enumerator.hasMoreElements()) {
-          let pref = enumerator.getNext().QueryInterface(Components.interfaces.nsIProperty);
-          this.prefs.push({host: null, name: pref.name, value: pref.value});
-          this.displayedPrefs.push(this.prefs.length - 1);
-        }
+    // get all groups (hosts) that match the domain
+    let domain = gDomains.selectedDomainName;
+    if (domain == "*") {
+      let enumerator = gLocSvc.cpref.getPrefs(null).enumerator;
+      while (enumerator.hasMoreElements()) {
+        let pref = enumerator.getNext().QueryInterface(Components.interfaces.nsIProperty);
+        this.prefs.push({host: null, name: pref.name, value: pref.value});
+        this.displayedPrefs.push(this.prefs.length - 1);
       }
-      else {
+    }
+    else {
+      try {
         let sql = "SELECT groups.name AS host FROM groups WHERE host=:hostName OR host LIKE :hostMatch ESCAPE '/'";
         var statement = gLocSvc.cpref.DBConnection.createStatement(sql);
         statement.params.hostName = domain;
@@ -1477,9 +1590,9 @@ var gPrefs = {
           }
         }
       }
-    }
-    finally {
-      statement.reset();
+      finally {
+        statement.reset();
+      }
     }
     this.sort(null, false, false);
     this.tree.treeBoxObject.endUpdateBatch();
@@ -1612,11 +1725,78 @@ var gPrefs = {
 
   reactToChange: function prefs_reactToChange(aSubject, aState) {
     // aState: prefSet, prefRemoved
-    if (aState == "prefSet") {
-      Services.console.logStringMessage("content pref setting observed: " + aSubject.host + ", " + aSubject.name + ", " + aSubject.value);
+
+    // Do "surgical" updates.
+    let domain = gDomains.getDomainFromHost(aSubject.host);
+    // Does change affect possibly loaded Preferences pane?
+    let affectsLoaded = this.displayedPrefs.length &&
+                        gDomains.hostMatchesSelected(aSubject.host);
+    idx = -1; disp_idx = -1; domainPrefs = 0;
+    if (affectsLoaded) {
+      for (let i = 0; i < this.displayedPrefs.length; i++) {
+        let cpref = this.prefs[this.displayedPrefs[i]];
+        if (cpref && cpref.host == aSubject.host && cpref.name == aSubject.name) {
+          idx = this.displayedPrefs[i]; disp_idx = i;
+          break;
+        }
+      }
+      if (aState == "prefRemoved")
+        domainPrefs = this.displayedPrefs.length;
     }
     else if (aState == "prefRemoved") {
-      Services.console.logStringMessage("content pref removal observed: " + aSubject.host + ", " + aSubject.name);
+      // See if there are any prefs left for that domain.
+      if (domain == "*") {
+        let enumerator = gLocSvc.cpref.getPrefs(null).enumerator;
+        if (enumerator.hasMoreElements())
+          domainPrefs++;
+      }
+      else {
+        try {
+          let sql = "SELECT groups.name AS host FROM groups WHERE host=:hostName OR host LIKE :hostMatch ESCAPE '/'";
+          var statement = gLocSvc.cpref.DBConnection.createStatement(sql);
+          statement.params.hostName = domain;
+          statement.params.hostMatch = "%." + statement.escapeStringForLIKE(domain, "/");
+          while (statement.executeStep()) {
+            // now, get all prefs for that host
+            let enumerator = gLocSvc.cpref.getPrefs(statement.row["host"]).enumerator;
+            if (enumerator.hasMoreElements())
+              domainPrefs++;
+          }
+        }
+        finally {
+          statement.reset();
+        }
+      }
+      if (!domainPrefs)
+        gDomains.removeDomainOrFlag(domain, "hasPreferences");
+    }
+    if (idx >= 0) {
+      if (aState == "prefSet") {
+        this.prefs[idx] = aSubject;
+        if (affectsLoaded)
+          this.tree.treeBoxObject.invalidateRow(disp_idx);
+      }
+      else if (aState == "prefRemoved") {
+        this.prefs[idx] = null;
+        if (affectsLoaded) {
+          this.displayedPrefs.splice(disp_idx, 1);
+          this.tree.treeBoxObject.rowCountChanged(disp_idx, -1);
+        }
+        if (domainPrefs == 1)
+          gDomains.removeDomainOrFlag(domain, "hasPreferences");
+      }
+    }
+    else if (aState == "prefSet") {
+      // Pref set, no prev index known - either new or existing pref domain.
+      if (affectsLoaded) {
+        this.prefs.push(aSubject);
+        this.displayedPrefs.push(this.prefs.length - 1);
+        this.tree.treeBoxObject.rowCountChanged(this.prefs.length - 1, 1);
+        this.sort(null, true, false);
+      }
+      else {
+        gDomains.addDomainOrFlag(aSubject.host, "hasPreferences");
+      }
     }
   },
 
@@ -1931,7 +2111,7 @@ var gFormdata = {
         let nextElem = enumerator.getNext();
         if (nextElem instanceof Components.interfaces.nsISupportsString ||
             nextElem instanceof Components.interfaces.nsISupportsPRInt64) {
-          subjectData.push(nextElem);
+          subjectData.push(nextElem.data);
         }
       }
     }
@@ -1945,7 +2125,7 @@ var gFormdata = {
       try {
         let sql = "SELECT fieldname, value, timesUsed, firstUsed, lastUsed, guid FROM moz_formhistory WHERE guid=:guid";
         var statement = gLocSvc.fhist.DBConnection.createStatement(sql);
-        statement.params.guid = subjectData[2].toString();
+        statement.params.guid = subjectData[2];
         while (statement.executeStep()) {
           entryData = {fieldname: statement.row["fieldname"],
                        value: statement.row["value"],
