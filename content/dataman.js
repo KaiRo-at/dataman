@@ -1036,22 +1036,24 @@ var gPerms = {
     if (/^hostSaving/.test(aState)) {
       // aState: hostSavingEnabled, hostSavingDisabled
       aSubject.QueryInterface(Components.interfaces.nsISupportsString);
-      let domain = gDomains.getDomainFromHost(aSubject);
+      Services.console.logStringMessage("signon permission change observed: " + aSubject.data + ", " + aState);
+      let domain = gDomains.getDomainFromHost(aSubject.data);
       // Does change affect possibly loaded Preferences pane?
       let affectsLoaded = this.list.childElementCount &&
-                          gDomains.hostMatchesSelected(aSubject);
+                          gDomains.hostMatchesSelected(aSubject.data);
       let permElem = null;
       if (affectsLoaded) {
         for (let i = 0; i < this.list.children.length; i++) {
           let elem = this.list.children[i];
-          if (elem.getAttribute("host") == aSubject &&
+          if (elem.getAttribute("host") == aSubject.data &&
               elem.getAttribute("type") == "password")
             permElem = elem;
         }
       }
       if (aState == "hostSavingEnabled") {
         if (affectsLoaded) {
-          permElem.setCapability(Services.perms.ALLOW_ACTION);
+          if (permElem.capability != Services.perms.ALLOW_ACTION)
+            permElem.setCapability(Services.perms.ALLOW_ACTION);
         }
         else {
           // Only remove if domain is not shown, note that this may leave an empty domain.
@@ -1060,7 +1062,7 @@ var gPerms = {
           while (enumerator.hasMoreElements()) {
             let nextPermission = enumerator.getNext();
             nextPermission = nextPermission.QueryInterface(Components.interfaces.nsIPermission);
-            if (domain == gDomains.getDomainFromHost(nextPermission.host.replace(/^\./, ""))
+            if (domain == gDomains.getDomainFromHost(nextPermission.host.replace(/^\./, "")))
               haveDomainPerms = true;
           }
           let rejectHosts = gLocSvc.pwd.getAllDisabledHosts();
@@ -1075,12 +1077,13 @@ var gPerms = {
       else if (aState == "hostSavingDisabled") {
         if (affectsLoaded) {
           if (permElem) {
-            permElem.setCapability(Services.perms.DENY_ACTION);
+            if (permElem.capability != Services.perms.DENY_ACTION)
+              permElem.setCapability(Services.perms.DENY_ACTION);
           }
           else {
             permElem = document.createElement("richlistitem");
             permElem.setAttribute("type", "password");
-            permElem.setAttribute("host", aSubject);
+            permElem.setAttribute("host", aSubject.data);
             permElem.setAttribute("rawHost", domain);
             permElem.setAttribute("capability", 2);
             permElem.setAttribute("class", "permission");
@@ -1088,16 +1091,22 @@ var gPerms = {
             this.list.appendChild(permElem);
           }
         }
-        else {
-          gDomains.addDomainOrFlag(aSubject, "hasPermissions");
-        }
+        gDomains.addDomainOrFlag(aSubject.data, "hasPermissions");
       }
     }
     else {
       // aState: added, changed, deleted, cleared
       // See http://mxr.mozilla.org/mozilla-central/source/netwerk/base/public/nsIPermissionManager.idl
       if (aState == "cleared") {
-        gDomains.resetFlagToDomains("hasPermissions", []);
+        let domainList = [];
+        // Blocked passwords still belong in the list.
+        let rejectHosts = gLocSvc.pwd.getAllDisabledHosts();
+        for (let i = 0; i < rejectHosts.length; i++) {
+          let dom = gDomains.getDomainFromHost(rejectHosts[i]);
+          if (domainList.indexOf(dom) == -1)
+            domainList.push(dom);
+        }
+        gDomains.resetFlagToDomains("hasPermissions", domainList);
         return;
       }
       aSubject.QueryInterface(Components.interfaces.nsIPermission);
@@ -1125,7 +1134,7 @@ var gPerms = {
           while (enumerator.hasMoreElements()) {
             let nextPermission = enumerator.getNext();
             nextPermission = nextPermission.QueryInterface(Components.interfaces.nsIPermission);
-            if (domain == gDomains.getDomainFromHost(nextPermission.host.replace(/^\./, ""))
+            if (domain == gDomains.getDomainFromHost(nextPermission.host.replace(/^\./, "")))
               haveDomainPerms = true;
           }
           let rejectHosts = gLocSvc.pwd.getAllDisabledHosts();
@@ -1142,18 +1151,25 @@ var gPerms = {
       }
       else if (aState == "added") {
         if (affectsLoaded) {
-          permElem = document.createElement("richlistitem");
-          permElem.setAttribute("type", aSubject.type);
-          permElem.setAttribute("host", aSubject.host);
-          permElem.setAttribute("rawHost", (aSubject.host.charAt(0) == ".") ? aSubject.host.substring(1, aSubject.host.length) : host);
-          permElem.setAttribute("capability", aSubject.capability);
-          permElem.setAttribute("class", "permission");
-          permElem.setAttribute("orient", "vertical");
-          this.list.appendChild(permElem);
+          if (permElem) {
+            permElem.useDefault(false);
+            permElem.setCapability(aSubject.capability);
+          }
+          else {
+            permElem = document.createElement("richlistitem");
+            permElem.setAttribute("type", aSubject.type);
+            permElem.setAttribute("host", aSubject.host);
+            permElem.setAttribute("rawHost",
+                                  (aSubject.host.charAt(0) == ".") ?
+                                  aSubject.host.substring(1, aSubject.host.length) :
+                                  aSubject.host);
+            permElem.setAttribute("capability", aSubject.capability);
+            permElem.setAttribute("class", "permission");
+            permElem.setAttribute("orient", "vertical");
+            this.list.appendChild(permElem);
+          }
         }
-        else {
-          gDomains.addDomainOrFlag(aSubject.host, "hasPermissions");
-        }
+        gDomains.addDomainOrFlag(aSubject.host, "hasPermissions");
       }
     }
   },
