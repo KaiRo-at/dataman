@@ -51,7 +51,7 @@ XPCOMUtils.defineLazyServiceGetter(gLocSvc, "cookie",
                                    "nsICookieManager2");
 XPCOMUtils.defineLazyServiceGetter(gLocSvc, "cpref",
                                    "@mozilla.org/content-pref/service;1",
-                                   "nsIContentPrefService");
+                                   "nsIContentPrefService"); // rv: >= 2.0b3 - Services.contentPrefs
 XPCOMUtils.defineLazyServiceGetter(gLocSvc, "pwd",
                                    "@mozilla.org/login-manager;1",
                                    "nsILoginManager");
@@ -69,6 +69,7 @@ XPCOMUtils.defineLazyServiceGetter(gLocSvc, "clipboard",
                                    "nsIClipboardHelper");
 
 var gDatamanBundle = null;
+var gDatamanDebug = false;
 
 function initialize() {
   gDatamanBundle = document.getElementById("datamanBundle");
@@ -111,7 +112,8 @@ var gChangeObserver = {
         gFormdata.reactToChange(aSubject, aState);
         break;
       default:
-        // unexpected topic observed, should we report an error/warning?
+        if (gDatamanDebug)
+          Components.utils.reportError("Unexpected change topic observed: " + aTopic);
         break;
     }
   },
@@ -132,11 +134,17 @@ var gDomains = {
   domains: {},
   domainObjects: [],
   displayedDomains: [],
+  selectedDomain: {},
+  xlcache_hosts: [],
+  xlcache_domains: [],
 
   ignoreSelect: false,
   ignoreUpdate: false,
 
   initialize: function domain_initialize() {
+    if (gDatamanDebug)
+      Services.console.logStringMessage("Start building domain list: " + Date.now()/1000);
+
     this.tree = document.getElementById("domainTree");
     this.tree.view = domainTreeView;
 
@@ -155,12 +163,16 @@ var gDomains = {
                              hasFormData: true});
 
     // add domains for all cookies we find
+    if (gDatamanDebug)
+      Services.console.logStringMessage("Add cookies to domain list: " + Date.now()/1000);
     gCookies.loadList();
     for (let i = 0; i < gCookies.cookies.length; i++) {
       this.addDomainOrFlag(gCookies.cookies[i].rawHost, "hasCookies");
     }
 
     // add domains for permissions
+    if (gDatamanDebug)
+      Services.console.logStringMessage("Add permissions to domain list: " + Date.now()/1000);
     let enumerator = Services.perms.enumerator;
     while (enumerator.hasMoreElements()) {
       let nextPermission = enumerator.getNext();
@@ -168,12 +180,16 @@ var gDomains = {
       this.addDomainOrFlag(nextPermission.host.replace(/^\./, ""), "hasPermissions");
     }
     // add domains for password rejects to permissions
+    if (gDatamanDebug)
+      Services.console.logStringMessage("Add pwd reject permissions to domain list: " + Date.now()/1000);
     let rejectHosts = gLocSvc.pwd.getAllDisabledHosts();
     for (let i = 0; i < rejectHosts.length; i++) {
       this.addDomainOrFlag(rejectHosts[i], "hasPermissions");
     }
 
     // add domains for content prefs
+    if (gDatamanDebug)
+      Services.console.logStringMessage("Add content prefs to domain list: " + Date.now()/1000);
     try {
       var statement = gLocSvc.cpref.DBConnection.createStatement("SELECT groups.name AS host FROM groups");
       while (statement.executeStep()) {
@@ -185,15 +201,22 @@ var gDomains = {
     }
 
     // add domains for passwords
+    if (gDatamanDebug)
+      Services.console.logStringMessage("Add passwords to domain list: " + Date.now()/1000);
     gPasswords.loadList();
     for (let i = 0; i < gPasswords.allSignons.length; i++) {
       this.addDomainOrFlag(gPasswords.allSignons[i].hostname, "hasPasswords");
     }
 
+    if (gDatamanDebug)
+      Services.console.logStringMessage("Finalize domain list: " + Date.now()/1000);
     this.ignoreUpdate = false;
     this.search("");
     this.tree.view.selection.select(0);
     gTabs.formdataTab.focus();
+
+    if (gDatamanDebug)
+      Services.console.logStringMessage("Domain list built: " + Date.now()/1000);
   },
 
   shutdown: function domain_shutdown() {
@@ -210,31 +233,36 @@ var gDomains = {
 
   getDomainFromHost: function domain_getDomainFromHost(aHostname) {
     // find the base domain name for the given host name
+    var cache_idx = this.xlcache_hosts.indexOf(aHostname);
+    if (cache_idx < 0) {
+      // return vars for nsIURLParser must all be objects
+      // see bug 568997 for improvements to that interface
+      var schemePos = {}, schemeLen = {}, authPos = {}, authLen = {}, pathPos = {},
+          pathLen = {}, usernamePos = {}, usernameLen = {}, passwordPos = {},
+          passwordLen = {}, hostnamePos = {}, hostnameLen = {}, port = {};
+      gLocSvc.url.parseURL(aHostname, -1, schemePos, schemeLen, authPos, authLen,
+                          pathPos, pathLen);
+      var auth = aHostname.substring(authPos.value, authPos.value + authLen.value);
+      gLocSvc.url.parseAuthority(auth, authLen.value, usernamePos, usernameLen,
+                                passwordPos, passwordLen, hostnamePos, hostnameLen, port);
+      var hostName = auth.substring(hostnamePos.value, hostnamePos.value + hostnameLen.value);
 
-    // return vars for nsIURLParser must all be objects
-    // see bug 568997 for improvements to that interface
-    var schemePos = {}, schemeLen = {}, authPos = {}, authLen = {}, pathPos = {},
-        pathLen = {}, usernamePos = {}, usernameLen = {}, passwordPos = {},
-        passwordLen = {}, hostnamePos = {}, hostnameLen = {}, port = {};
-    gLocSvc.url.parseURL(aHostname, -1, schemePos, schemeLen, authPos, authLen,
-                         pathPos, pathLen);
-    var auth = aHostname.substring(authPos.value, authPos.value + authLen.value);
-    gLocSvc.url.parseAuthority(auth, authLen.value, usernamePos, usernameLen,
-                               passwordPos, passwordLen, hostnamePos, hostnameLen, port);
-    var hostName = auth.substring(hostnamePos.value, hostnamePos.value + hostnameLen.value);
-
-    var domain;
-    try {
-      domain = gLocSvc.eTLD.getBaseDomainFromHost(hostName);
+      var domain;
+      try {
+        domain = gLocSvc.eTLD.getBaseDomainFromHost(hostName);
+      }
+      catch (e) {
+        domain = hostName;
+      }
+      this.xlcache_hosts.push(aHostname);
+      this.xlcache_domains.push(domain);
+      cache_idx = this.xlcache_hosts.length - 1;
     }
-    catch (e) {
-      domain = hostName;
-    }
-    return domain;
+    return this.xlcache_domains[cache_idx];
   },
 
   hostMatchesSelected: function domain_hostMatchesSelected(aHostname) {
-    return this.getDomainFromHost(aHostname) == this.selectedDomainName;
+    return this.getDomainFromHost(aHostname) == this.selectedDomain.title;
   },
 
   addDomainOrFlag: function domain_addDomainOrFlag(aHostname, aFlag) {
@@ -258,7 +286,7 @@ var gDomains = {
     if (idx >= 0 && !this.ignoreUpdate) {
       if (domAdded)
         this.search(this.searchfield.value);
-      else if (domain == this.selectedDomainName) {
+      else if (domain == this.selectedDomain.title) {
         this.ignoreUpdate = true;
         this.select();
         this.ignoreUpdate = false;
@@ -337,8 +365,14 @@ var gDomains = {
   },
 
   select: function domain_select() {
-    if (this.ignoreSelect)
+    if (this.ignoreSelect) {
+      if (this.tree.view.selection.count == 1)
+        this.selectedDomain = this.domainObjects[this.displayedDomains[this.tree.currentIndex]];
       return;
+    }
+
+    if (gDatamanDebug)
+      Services.console.logStringMessage("Domain selected: " + Date.now()/1000);
 
     if (!this.tree.view.selection.count) {
       gTabs.cookiesTab.disabled = true;
@@ -350,22 +384,24 @@ var gDomains = {
       gTabs.forgetTab.hidden = true;
       gTabs.forgetTab.disabled = true;
       gTabs.select();
+      this.selectedDomain = {title: false};
       return;
     }
 
     if (this.tree.view.selection.count > 1) {
       Components.utils.reportError("Data Manager doesn't support anything but one selected domain");
       this.tree.view.selection.clearSelection();
+      this.selectedDomain = {title: false};
       return;
     }
-    let selectedDomain = this.selectedDomainObj;
+    this.selectedDomain = this.domainObjects[this.displayedDomains[this.tree.currentIndex]];
     // disable/enable and hide/show the tabs as needed
-    gTabs.cookiesTab.disabled = !selectedDomain.hasCookies;
-    gTabs.permissionsTab.disabled = !selectedDomain.hasPermissions;
-    gTabs.preferencesTab.disabled = !selectedDomain.hasPreferences;
-    gTabs.passwordsTab.disabled = !selectedDomain.hasPasswords;
-    gTabs.formdataTab.hidden = !selectedDomain.hasFormData;
-    gTabs.formdataTab.disabled = !selectedDomain.hasFormData;
+    gTabs.cookiesTab.disabled = !this.selectedDomain.hasCookies;
+    gTabs.permissionsTab.disabled = !this.selectedDomain.hasPermissions;
+    gTabs.preferencesTab.disabled = !this.selectedDomain.hasPreferences;
+    gTabs.passwordsTab.disabled = !this.selectedDomain.hasPasswords;
+    gTabs.formdataTab.hidden = !this.selectedDomain.hasFormData;
+    gTabs.formdataTab.disabled = !this.selectedDomain.hasFormData;
     gTabs.forgetTab.hidden = true;
     let prevtab = gTabs.tabbox.selectedTab || gTabs.cookiesTab;
     let stoptab = null;
@@ -377,20 +413,9 @@ var gDomains = {
     }
     if (!this.ignoreUpdate)
       gTabs.select();
-  },
 
-  get selectedDomainObj() {
-    if (!this.tree.view.selection.count)
-      return false;
-
-    return this.domainObjects[this.displayedDomains[this.tree.currentIndex]];
-  },
-
-  get selectedDomainName() {
-    if (!this.tree.view.selection.count)
-      return false;
-
-    return this.domainObjects[this.displayedDomains[this.tree.currentIndex]].title;
+    if (gDatamanDebug)
+      Services.console.logStringMessage("Domain select finished: " + Date.now()/1000);
   },
 
   handleKeyPress: function domain_handleKeyPress(aEvent) {
@@ -443,11 +468,11 @@ var gDomains = {
 
   updateContext: function domain_updateContext() {
     let forgetCtx = document.getElementById("domain-context-forget");
-    forgetCtx.disabled = !this.selectedDomainName;
-    forgetCtx.label = (this.selectedDomainName == "*") ?
+    forgetCtx.disabled = !this.selectedDomain.title;
+    forgetCtx.label = (this.selectedDomain.title == "*") ?
                       forgetCtx.getAttribute("label_global") :
                       forgetCtx.getAttribute("label_domain");
-    forgetCtx.accesskey = (this.selectedDomainName == "*") ?
+    forgetCtx.accesskey = (this.selectedDomain.title == "*") ?
                           forgetCtx.getAttribute("accesskey_global") :
                           forgetCtx.getAttribute("accesskey_domain");
   },
@@ -607,9 +632,9 @@ var gCookies = {
     this.removeButton = document.getElementById("cookieRemove");
     this.blockOnRemove = document.getElementById("cookieBlockOnRemove");
 
-    this.tree.treeBoxObject.beginUpdateBatch();
     if (!this.cookies.length)
       this.loadList();
+    this.tree.treeBoxObject.beginUpdateBatch();
     for (let i = 0; i < this.cookies.length; i++) {
       if (this.cookies[i] &&
           gDomains.hostMatchesSelected(this.cookies[i].rawHost))
@@ -817,7 +842,7 @@ var gCookies = {
                             this.blockOnRemove.checked);
     }
     if (!this.displayedCookies.length)
-      gDomains.removeDomainOrFlag(gDomains.selectedDomainName, "hasCookies");
+      gDomains.removeDomainOrFlag(gDomains.selectedDomain.title, "hasCookies");
   },
 
   updateContext: function cookies_updateContext() {
@@ -848,7 +873,7 @@ var gCookies = {
       gDomains.resetFlagToDomains("hasCookies", domainList);
       // Restore the local panel display if needed
       if (gTabs.activePanel == "cookiesPanel" &&
-          gDomains.selectedDomainObj.hasCookies) {
+          gDomains.selectedDomain.hasCookies) {
         this.tree.treeBoxObject.beginUpdateBatch();
         for (let i = 0; i < this.cookies.length; i++) {
           if (this.cookies[i] &&
@@ -1590,7 +1615,7 @@ var gPrefs = {
 
     this.tree.treeBoxObject.beginUpdateBatch();
     // get all groups (hosts) that match the domain
-    let domain = gDomains.selectedDomainName;
+    let domain = gDomains.selectedDomain.title;
     if (domain == "*") {
       let enumerator = gLocSvc.cpref.getPrefs(null).enumerator;
       while (enumerator.hasMoreElements()) {
@@ -1829,7 +1854,7 @@ var gPrefs = {
     let delPrefs = [];
     try {
       // get all groups (hosts) that match the domain
-      let domain = gDomains.selectedDomainName;
+      let domain = gDomains.selectedDomain.title;
       if (domain == "*") {
         let enumerator =  gLocSvc.cpref.getPrefs(null).enumerator;
         while (enumerator.hasMoreElements()) {
@@ -2266,12 +2291,11 @@ var gForget = {
     this.forgetFormdataLabel = document.getElementById("forgetFormdataLabel");
     this.forgetButton = document.getElementById("forgetButton");
 
-    let selectedDomain = gDomains.selectedDomainObj;
-    if (selectedDomain.title == "*")
+    if (gDomains.selectedDomain.title == "*")
       this.forgetDesc.value = gDatamanBundle.getString("forget.desc.global.pre");
     else
       this.forgetDesc.value = gDatamanBundle.getFormattedString("forget.desc.domain.pre",
-                                                                [selectedDomain.title]);
+                                                                [gDomains.selectedDomain.title]);
 
     this.forgetCookies.disabled = !selectedDomain.hasCookies;
     this.forgetPermissions.disabled = !selectedDomain.hasPermissions;
@@ -2340,11 +2364,11 @@ var gForget = {
     }
     this.forgetFormdata.hidden = true;
 
-    if (gDomains.selectedDomainName == "*")
+    if (gDomains.selectedDomain.title == "*")
       this.forgetDesc.value = gDatamanBundle.getString("forget.desc.global.post");
     else
       this.forgetDesc.value = gDatamanBundle.getFormattedString("forget.desc.domain.post",
-                                                                [gDomains.selectedDomainName]);
+                                                                [gDomains.selectedDomain.title]);
     this.forgetButton.hidden = true;
   },
 };
