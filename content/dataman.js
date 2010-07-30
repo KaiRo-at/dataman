@@ -776,7 +776,7 @@ var gCookies = {
     let dirFactor = dirAscending ? 1 : -1;
 
     // Clear attributes on all columns, we're setting them again after sorting
-    for (var node = column.parentNode.firstChild; node; node = node.nextSibling) {
+    for (let node = column.parentNode.firstChild; node; node = node.nextSibling) {
       node.removeAttribute("sortActive");
       node.removeAttribute("sortDirection");
     }
@@ -1324,7 +1324,7 @@ var gPasswords = {
     let dirFactor = dirAscending ? 1 : -1;
 
     // Clear attributes on all columns, we're setting them again after sorting
-    for (var node = column.parentNode.firstChild; node; node = node.nextSibling) {
+    for (let node = column.parentNode.firstChild; node; node = node.nextSibling) {
       node.removeAttribute("sortActive");
       node.removeAttribute("sortDirection");
     }
@@ -1700,7 +1700,7 @@ var gPrefs = {
     let dirFactor = dirAscending ? 1 : -1;
 
     // Clear attributes on all columns, we're setting them again after sorting
-    for (var node = column.parentNode.firstChild; node; node = node.nextSibling) {
+    for (let node = column.parentNode.firstChild; node; node = node.nextSibling) {
       node.removeAttribute("sortActive");
       node.removeAttribute("sortDirection");
     }
@@ -2028,7 +2028,7 @@ var gFormdata = {
     let dirFactor = dirAscending ? 1 : -1;
 
     // Clear attributes on all columns, we're setting them again after sorting
-    for (var node = column.parentNode.firstChild; node; node = node.nextSibling) {
+    for (let node = column.parentNode.firstChild; node; node = node.nextSibling) {
       node.removeAttribute("sortActive");
       node.removeAttribute("sortDirection");
     }

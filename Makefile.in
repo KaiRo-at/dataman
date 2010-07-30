@@ -45,7 +45,7 @@ include $(DEPTH)/config/autoconf.mk
 
 MODULE       = dataman
 
-EXTENSION_VERSION      = 1.0
+EXTENSION_VERSION      = 1.1
 
 XPI_NAME               = dataman
 USE_EXTENSION_MANIFEST = 1
