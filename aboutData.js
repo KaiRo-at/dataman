@@ -35,6 +35,7 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
+Components.utils.import("resource://gre/modules/Services.jsm");
 Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 function AboutData() { }
@@ -49,9 +50,8 @@ AboutData.prototype = {
   },
 
   newChannel: function(aURI) {
-    let ios = Components.classes["@mozilla.org/network/io-service;1"].getService(Components.interfaces.nsIIOService);
-    let channel = ios.newChannel("chrome://dataman/content/dataman.xul",
-                                 null, null);
+    let channel = Services.io.newChannel("chrome://communicator/content/dataman/dataman.xul",
+                                         null, null);
     channel.originalURI = aURI;
     return channel;
   }
