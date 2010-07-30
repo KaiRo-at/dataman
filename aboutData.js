@@ -50,7 +50,7 @@ AboutData.prototype = {
   },
 
   newChannel: function(aURI) {
-    let channel = Services.io.newChannel("chrome://communicator/content/dataman/dataman.xul",
+    let channel = Services.io.newChannel("chrome://dataman/content/dataman.xul",
                                          null, null);
     channel.originalURI = aURI;
     return channel;
