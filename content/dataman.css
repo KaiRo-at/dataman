@@ -35,6 +35,12 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
+/* generic item gets used for permissions that don't need any special treatment */
+richlistitem.permission {
+  -moz-binding: url('chrome://dataman/content/dataman.xml#perm-generic-item');
+  -moz-box-orient: vertical;
+}
+
 richlistitem.permission[type="cookie"] {
   -moz-binding: url('chrome://dataman/content/dataman.xml#perm-cookie-item');
 }
@@ -45,9 +51,4 @@ richlistitem.permission[type="geo"] {
 
 richlistitem.permission[type="password"] {
   -moz-binding: url('chrome://dataman/content/dataman.xml#perm-password-item');
-}
-
-/* generic item gets used for permissions that don't need any special treatment */
-richlistitem.permission:not([type="cookie"]):not([type="geo"]):not([type="password"]) {
-  -moz-binding: url('chrome://dataman/content/dataman.xml#perm-generic-item');
 }

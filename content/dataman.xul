@@ -48,7 +48,8 @@
 ]>
 
 <page xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
-      id="data-page" title="&dataman.windowTitle;">
+      id="dataman-page" title="&dataman.windowTitle;"
+      onload="gDataman.initialize();" onunload="gDataman.shutdown();">
 
   <script type="application/javascript"
           src="chrome://dataman/content/dataman.js"/>
@@ -82,18 +83,18 @@
   </keyset>
 
   <popupset id="datamanContextSet">
-    <popup id="domainTreeContextMenu"
-           onpopupshowing="gDomains.updateContext()">
+    <menupopup id="domainTreeContextMenu"
+               onpopupshowing="gDomains.updateContext()">
       <menuitem id="domain-context-forget"
                 label_domain="&domain.ctx.forgetdomain.label;"
                 accesskey_domain="&domain.ctx.forgetdomain.accesskey;"
                 label_global="&domain.ctx.forgetglobal.label;"
                 accesskey_global="&domain.ctx.forgetglobal.accesskey;"
                 oncommand="gDomains.forget();"/>
-    </popup>
+    </menupopup>
 
-    <popup id="cookiesTreeContextMenu"
-           onpopupshowing="gCookies.updateContext()">
+    <menupopup id="cookiesTreeContextMenu"
+               onpopupshowing="gCookies.updateContext()">
       <menuitem id="cookies-context-remove"
                 label="&cookies.ctx.remove.label;"
                 accesskey="&cookies.ctx.remove.accesskey;"
@@ -102,10 +103,10 @@
                 label="&cookies.ctx.selectAll.label;"
                 accesskey="&cookies.ctx.selectAll.accesskey;"
                 oncommand="gCookies.selectAll()"/>
-    </popup>
+    </menupopup>
 
-    <popup id="prefsTreeContextMenu"
-           onpopupshowing="gPrefs.updateContext()">
+    <menupopup id="prefsTreeContextMenu"
+               onpopupshowing="gPrefs.updateContext()">
       <menuitem id="prefs-context-remove"
                 label="&prefs.ctx.remove.label;"
                 accesskey="&prefs.ctx.remove.accesskey;"
@@ -114,10 +115,10 @@
                 label="&prefs.ctx.selectAll.label;"
                 accesskey="&prefs.ctx.selectAll.accesskey;"
                 oncommand="gPrefs.selectAll()"/>
-    </popup>
+    </menupopup>
 
-    <popup id="passwordsTreeContextMenu"
-           onpopupshowing="gPasswords.updateContext()">
+    <menupopup id="passwordsTreeContextMenu"
+               onpopupshowing="gPasswords.updateContext()">
       <menuitem id="pwd-context-remove"
                 label="&pwd.ctx.remove.label;"
                 accesskey="&pwd.ctx.remove.accesskey;"
@@ -130,10 +131,10 @@
                 label="&pwd.ctx.selectAll.label;"
                 accesskey="&pwd.ctx.selectAll.accesskey;"
                 oncommand="gPasswords.selectAll()"/>
-    </popup>
+    </menupopup>
 
-    <popup id="formdataTreeContextMenu"
-           onpopupshowing="gFormdata.updateContext()">
+    <menupopup id="formdataTreeContextMenu"
+               onpopupshowing="gFormdata.updateContext()">
       <menuitem id="fdata-context-remove"
                 label="&fdata.ctx.remove.label;"
                 accesskey="&fdata.ctx.remove.accesskey;"
@@ -142,7 +143,7 @@
                 label="&fdata.ctx.selectAll.label;"
                 accesskey="&fdata.ctx.selectAll.accesskey;"
                 oncommand="gFormdata.selectAll()"/>
-    </popup>
+    </menupopup>
   </popupset>
 
   <hbox flex="1">
@@ -180,7 +181,7 @@
       </tabs>
 
       <tabpanels id="tabpanels" flex="1">
-        <vbox id="cookiesPanel" flex="1">
+        <vbox id="cookiesPanel">
           <description>&cookies.description;</description>
           <tree id="cookiesTree" flex="1"
                 onkeypress="gCookies.handleKeyPress(event)"
@@ -270,12 +271,11 @@
           </hbox>
         </vbox>
 
-        <vbox id="permissionsPanel" flex="1">
-          <richlistbox id="permList" flex="1">
-          </richlistbox>
+        <vbox id="permissionsPanel">
+          <richlistbox id="permList" flex="1"/>
         </vbox>
 
-        <vbox id="preferencesPanel" flex="1">
+        <vbox id="preferencesPanel">
           <description>&prefs.description;</description>
           <tree id="prefsTree" flex="1"
                 onkeypress="gPrefs.handleKeyPress(event)"
@@ -304,7 +304,7 @@
           </hbox>
         </vbox>
 
-        <vbox id="passwordsPanel" flex="1">
+        <vbox id="passwordsPanel">
           <description>&pwd.description;</description>
           <tree id="passwordsTree" flex="1" hidecolumnpicker="true"
                 onkeypress="gPasswords.handleKeyPress(event)"
@@ -336,8 +336,7 @@
           </hbox>
         </vbox>
 
-        <vbox id="formdataPanel" flex="1">
-          <description></description>
+        <vbox id="formdataPanel">
           <textbox id="fdataSearch"
                    clickSelectsAll="true"
                    type="search"
@@ -379,8 +378,8 @@
           </hbox>
         </vbox>
 
-        <vbox id="forgetPanel" flex="1">
-          <description id="forgetDesc">&forget.description;</description>
+        <vbox id="forgetPanel">
+          <description id="forgetDesc"/>
           <hbox>
             <checkbox id="forgetCookies" disabled="true"
                       label="&forget.cookies.label;"

@@ -46,7 +46,7 @@
   -moz-padding-start: 7px;
   -moz-padding-end: 7px;
   min-height: 25px;
-  border-bottom: 1px dotted #C0C0C0;
+  border-bottom: 1px dotted ThreeDFace;
 }
 
 .hostLabel {

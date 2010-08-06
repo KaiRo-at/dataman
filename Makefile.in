@@ -43,9 +43,13 @@ relativesrcdir = extensions/dataman
 
 include $(DEPTH)/config/autoconf.mk
 
+ifdef ENABLE_TESTS
+PARALLEL_DIRS += tests
+endif
+
 MODULE       = dataman
 
-EXTENSION_VERSION      = 1.1
+EXTENSION_VERSION      = 1.0.1
 
 XPI_NAME               = dataman
 USE_EXTENSION_MANIFEST = 1

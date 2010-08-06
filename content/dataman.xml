@@ -50,18 +50,11 @@
     <implementation>
       <constructor><![CDATA[
         var permLabel = document.getAnonymousElementByAttribute(this, "anonid", "permLabel");
-        switch (this.type) {
-          case "cookie":
-          case "geo":
-          case "image":
-          case "install":
-          case "password":
-          case "popup":
-            permLabel.value = gDatamanBundle.getString("perm." + this.type + ".label");
-            break;
-          default:
-            permLabel.value = this.type;
-            break;
+        try {
+          permLabel.value = gDataman.bundle.getString("perm." + this.type + ".label");
+        }
+        catch (e) {
+          permLabel.value = this.type;
         }
         this._updateRadio();
       ]]></constructor>
@@ -78,28 +71,17 @@
         ]]></setter>
       </property>
 
-      <property name="host">
-        <getter><![CDATA[
-          if (this.hasAttribute("host"))
-            return this.getAttribute("host");
-          return null;
-        ]]></getter>
-      </property>
+      <property name="host" readonly="true"
+                onget="return this.getAttribute('host');"/>
 
-      <property name="type">
-        <getter><![CDATA[
-          if (this.hasAttribute("type"))
-            return this.getAttribute("type");
-          return null;
-        ]]></getter>
-      </property>
+      <property name="type" readonly="true"
+                onget="return this.getAttribute('type');"/>
 
       <method name="_updateRadio">
         <body><![CDATA[
-          if (this.capability) {
-            let radio = document.getAnonymousElementByAttribute(this, "anonid", "permSetting-" + this.capability);
+          let radio = document.getAnonymousElementByAttribute(this, "anonid", "permSetting-" + this.capability);
+          if (radio)
             radio.radioGroup.selectedItem = radio;
-          }
           else {
             let radioGroup = document.getAnonymousElementByAttribute(this, "anonid", "radioGroup");
             radioGroup.selectedIndex = -1;
@@ -128,12 +110,9 @@
         <body><![CDATA[
           this.capability = aValue;
           let radio = document.getAnonymousElementByAttribute(this, "anonid", "permSetting-" + aValue);
-          if (!radio.selected)
+          if (radio && !radio.selected)
             radio.radioGroup.selectedItem = radio;
-          if (this.type == "password")
-            gLocSvc.pwd.setLoginSavingEnabled(this.host, aValue == Services.perms.ALLOW_ACTION);
-          else
-            Services.perms.add(Services.io.newURI("http://" + this.host, null, null), this.type, aValue);
+          Services.perms.add(Services.io.newURI("http://" + this.host, null, null), this.type, aValue);
         ]]></body>
       </method>
 
@@ -152,9 +131,9 @@
         <xul:spacer flex="1"/>
         <xul:radiogroup anonid="radioGroup" orient="horizontal">
           <xul:radio anonid="permSetting-1" label="&perm.Allow;"
-                     oncommand="document.getBindingParent(this).setCapability(1);"/>
+                     oncommand="document.getBindingParent(this).setCapability(Services.perms.ALLOW_ACTION);"/>
           <xul:radio anonid="permSetting-2" label="&perm.Block;"
-                     oncommand="document.getBindingParent(this).setCapability(2);"/>
+                     oncommand="document.getBindingParent(this).setCapability(Services.perms.DENY_ACTION);"/>
         </xul:radiogroup>
       </xul:hbox>
     </content>
@@ -172,11 +151,11 @@
         <xul:spacer flex="1"/>
         <xul:radiogroup anonid="radioGroup" orient="horizontal">
           <xul:radio anonid="permSetting-1" label="&perm.Allow;"
-                     oncommand="document.getBindingParent(this).setCapability(1);"/>
+                     oncommand="document.getBindingParent(this).setCapability(Services.perms.ALLOW_ACTION);"/>
           <xul:radio anonid="permSetting-8" label="&perm.AllowSession;"
-                     oncommand="document.getBindingParent(this).setCapability(8);"/>
+                     oncommand="document.getBindingParent(this).setCapability(Components.interfaces.nsICookiePermission.ACCESS_SESSION);"/>
           <xul:radio anonid="permSetting-2" label="&perm.Block;"
-                     oncommand="document.getBindingParent(this).setCapability(2);"/>
+                     oncommand="document.getBindingParent(this).setCapability(Services.perms.DENY_ACTION);"/>
         </xul:radiogroup>
       </xul:hbox>
     </content>
@@ -194,9 +173,9 @@
         <xul:spacer flex="1"/>
         <xul:radiogroup anonid="radioGroup" orient="horizontal">
           <xul:radio anonid="permSetting-1" label="&perm.Allow;"
-                     oncommand="document.getBindingParent(this).setCapability(1);"/>
+                     oncommand="document.getBindingParent(this).setCapability(Services.perms.ALLOW_ACTION);"/>
           <xul:radio anonid="permSetting-2" label="&perm.Block;"
-                     oncommand="document.getBindingParent(this).setCapability(2);"/>
+                     oncommand="document.getBindingParent(this).setCapability(Services.perms.DENY_ACTION);"/>
         </xul:radiogroup>
       </xul:hbox>
     </content>
@@ -213,12 +192,34 @@
         <xul:spacer flex="1"/>
         <xul:radiogroup anonid="radioGroup" orient="horizontal">
           <xul:radio anonid="permSetting-1" label="&perm.AskAlways;"
-                     oncommand="document.getBindingParent(this).setCapability(1);"/>
+                     oncommand="document.getBindingParent(this).setCapability(Services.perms.ALLOW_ACTION);"/>
           <xul:radio anonid="permSetting-2" label="&perm.NeverSave;"
-                     oncommand="document.getBindingParent(this).setCapability(2);"/>
+                     oncommand="document.getBindingParent(this).setCapability(Services.perms.DENY_ACTION);"/>
         </xul:radiogroup>
       </xul:hbox>
     </content>
+
+    <implementation>
+      <method name="useDefault">
+        <parameter name="aChecked"/>
+        <body><![CDATA[
+          // just for compat, makes it easier to generically "delete" perms
+          if (aChecked)
+            this.setCapability(Services.perms.ALLOW_ACTION);
+        ]]></body>
+      </method>
+
+      <method name="setCapability">
+        <parameter name="aValue"/>
+        <body><![CDATA[
+          this.capability = aValue;
+          let radio = document.getAnonymousElementByAttribute(this, "anonid", "permSetting-" + aValue);
+          if (radio && !radio.selected)
+            radio.radioGroup.selectedItem = radio;
+          gLocSvc.pwd.setLoginSavingEnabled(this.host, aValue == Services.perms.ALLOW_ACTION);
+        ]]></body>
+      </method>
+    </implementation>
   </binding>
 
 </bindings>

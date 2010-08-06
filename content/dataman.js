@@ -38,8 +38,11 @@
 Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
 Components.utils.import("resource://gre/modules/Services.jsm");
 
-window.addEventListener("load", initialize, false);
-window.addEventListener("unload", shutdown, false);
+// make this available in older versions, newer ones (2.0b3pre) have it already
+if (!("contentPrefs" in Services))
+  XPCOMUtils.defineLazyServiceGetter(Services, "contentPrefs",
+                                     "@mozilla.org/content-pref/service;1",
+                                     "nsIContentPrefService");
 
 // locally loaded services
 var gLocSvc = {};
@@ -49,9 +52,6 @@ XPCOMUtils.defineLazyServiceGetter(gLocSvc, "eTLD",
 XPCOMUtils.defineLazyServiceGetter(gLocSvc, "cookie",
                                    "@mozilla.org/cookiemanager;1",
                                    "nsICookieManager2");
-XPCOMUtils.defineLazyServiceGetter(gLocSvc, "cpref",
-                                   "@mozilla.org/content-pref/service;1",
-                                   "nsIContentPrefService"); // rv: >= 2.0b3 - Services.contentPrefs
 XPCOMUtils.defineLazyServiceGetter(gLocSvc, "pwd",
                                    "@mozilla.org/login-manager;1",
                                    "nsILoginManager");
@@ -68,163 +68,256 @@ XPCOMUtils.defineLazyServiceGetter(gLocSvc, "clipboard",
                                    "@mozilla.org/widget/clipboardhelper;1",
                                    "nsIClipboardHelper");
 
-var gDatamanBundle = null;
-var gDatamanDebug = false;
+// :::::::::::::::::::: general functions ::::::::::::::::::::
+var gDataman = {
+  bundle: null,
+  debug: false,
 
-function initialize() {
-  gDatamanBundle = document.getElementById("datamanBundle");
-  gTabs.initialize();
-  gDomains.initialize();
-}
+  initialize: function dataman_initialize() {
+    try {
+      this.debug = Services.prefs.getBoolPref("data_manager.debug");
+    }
+    catch (e) {}
+    this.bundle = document.getElementById("datamanBundle");
 
-function shutdown() {
-  gDomains.shutdown();
-}
+    Services.obs.addObserver(this, "cookie-changed", false);
+    Services.obs.addObserver(this, "perm-changed", false);
+    Services.obs.addObserver(this, "passwordmgr-storage-changed", false);
+    Services.contentPrefs.addObserver(null, this);
+    Services.obs.addObserver(this, "satchel-storage-changed", false);
 
-var gChangeObserver = {
-  interfaces: [Components.interfaces.nsIObserver,
-               Components.interfaces.nsIContentPrefObserver,
-               Components.interfaces.nsISupports],
-
-  QueryInterface: function ContentPrefTest_QueryInterface(iid) {
-    if (!this.interfaces.some( function(v) { return iid.equals(v) } ))
-      throw Components.results.NS_ERROR_NO_INTERFACE;
-    return this;
+    gTabs.initialize();
+    gDomains.initialize();
   },
 
-  observe: function changeobserver_observe(aSubject, aTopic, aState) {
+  shutdown: function dataman_shutdown() {
+    Services.obs.removeObserver(this, "cookie-changed");
+    Services.obs.removeObserver(this, "perm-changed");
+    Services.obs.removeObserver(this, "passwordmgr-storage-changed");
+    Services.contentPrefs.removeObserver(null, this);
+    Services.obs.removeObserver(this, "satchel-storage-changed");
+
+    gDomains.shutdown();
+  },
+
+  debugMsg: function dataman_debugMsg(aLogMessage) {
+    if (this.debug)
+      Services.console.logStringMessage(aLogMessage);
+  },
+
+  debugError: function dataman_debugError(aLogMessage) {
+    if (this.debug)
+      Components.utils.reportError(aLogMessage);
+  },
+
+  // :::::::::: data change observers ::::::::::
+  QueryInterface: XPCOMUtils.generateQI([Components.interfaces.nsIObserver,
+                                         Components.interfaces.nsIContentPrefObserver]),
+
+  observe: function co_observe(aSubject, aTopic, aData) {
+    gDataman.debugMsg("Observed: " + aTopic + " - " + aData);
     switch (aTopic) {
       case "cookie-changed":
-        gCookies.reactToChange(aSubject, aState);
+        gCookies.reactToChange(aSubject, aData);
         break;
       case "perm-changed":
-        gPerms.reactToChange(aSubject, aState);
+        gPerms.reactToChange(aSubject, aData);
         break;
       case "passwordmgr-storage-changed":
-        if (/^hostSaving/.test(aState)) {
-          gPerms.reactToChange(aSubject, aState);
-        }
-        else {
-          gPasswords.reactToChange(aSubject, aState);
-        }
+        if (/^hostSaving/.test(aData))
+          gPerms.reactToChange(aSubject, aData);
+        else
+          gPasswords.reactToChange(aSubject, aData);
         break;
       case "satchel-storage-changed":
-        gFormdata.reactToChange(aSubject, aState);
+        gFormdata.reactToChange(aSubject, aData);
         break;
       default:
-        if (gDatamanDebug)
-          Components.utils.reportError("Unexpected change topic observed: " + aTopic);
+        gDataman.debugError("Unexpected change topic observed: " + aTopic);
         break;
     }
   },
 
-  onContentPrefSet: function changeobserver_onContentPrefSet(aGroup, aName, aValue) {
+  onContentPrefSet: function co_onContentPrefSet(aGroup, aName, aValue) {
+    gDataman.debugMsg("Observed: content pref set");
     gPrefs.reactToChange({host: aGroup, name: aName, value: aValue}, "prefSet");
   },
 
-  onContentPrefRemoved: function changeobserver_onContentPrefRemoved(aGroup, aName) {
+  onContentPrefRemoved: function co_onContentPrefRemoved(aGroup, aName) {
+    gDataman.debugMsg("Observed: content pref removed");
     gPrefs.reactToChange({host: aGroup, name: aName}, "prefRemoved");
+  },
+
+  // :::::::::: utility functions ::::::::::
+  getTreeSelections: function dataman_getTreeSelections(aTree) {
+    let selections = [];
+    let select = aTree.view.selection;
+    if (select) {
+      let count = select.getRangeCount();
+      let min = new Object();
+      let max = new Object();
+      for (let i = 0; i < count; i++) {
+        select.getRangeAt(i, min, max);
+        for (var k = min.value; k <= max.value; k++)
+          if (k != -1)
+            selections.push(k)
+      }
+    }
+    return selections;
+  },
+
+  getSelectedIDs: function dataman_getSelectedIDs(aTree, aIDFunction) {
+    // Get IDs of selected elements for later restoration.
+    var selectionCache = [];
+    if (aTree.view.selection.count < 1)
+      return selectionCache;
+
+    // Walk all selected rows and cache their IDs.
+    var start = {};
+    var end = {};
+    var numRanges = aTree.view.selection.getRangeCount();
+    for (let rg = 0; rg < numRanges; rg++){
+      aTree.view.selection.getRangeAt(rg, start, end);
+      for (let row = start.value; row <= end.value; row++){
+        selectionCache.push(aIDFunction(row));
+      }
+    }
+    return selectionCache;
+  },
+
+  restoreSelectionFromIDs: function dataman_getSelectedIDs(aTree, aIDFunction, aCachedIDs) {
+    // Restore selection from cached IDs (as possible).
+    if (!aCachedIDs.length)
+      return;
+
+    aTree.view.selection.clearSelection();
+    // Find out wwhich current rows match a cached selection and add them to the selection.
+    for (let row = 0; row < aTree.view.rowCount; row++) {
+      if (aCachedIDs.indexOf(aIDFunction(row)) != -1)
+        aTree.view.selection.rangedSelect(row, row, true);
+    }
   },
 }
 
+// :::::::::::::::::::: base object to use as a prototype for all others ::::::::::::::::::::
+var gBaseTreeView = {
+  setTree: function(aTree) {},
+  getImageSrc: function(aRow, aColumn) {},
+  getProgressMode: function(aRow, aColumn) {},
+  getCellValue: function(aRow, aColumn) {},
+  isSeparator: function(aIndex) { return false; },
+  isSorted: function() { return false; },
+  isContainer: function(aIndex) { return false; },
+  cycleHeader: function(aCol) {},
+  getRowProperties: function(aRow, aProp) {},
+  getColumnProperties: function(aColumn, aProp) {},
+  getCellProperties: function(aRow, aColumn, aProp) {}
+};
+
+// :::::::::::::::::::: domain list ::::::::::::::::::::
 var gDomains = {
   tree: null,
   searchfield: null,
 
   domains: {},
-  domainObjects: [],
+  domainObjects: {},
   displayedDomains: [],
   selectedDomain: {},
-  xlcache_hosts: [],
-  xlcache_domains: [],
+  xlcache: {},
 
   ignoreSelect: false,
   ignoreUpdate: false,
 
   initialize: function domain_initialize() {
-    if (gDatamanDebug)
-      Services.console.logStringMessage("Start building domain list: " + Date.now()/1000);
+    gDataman.debugMsg("Start building domain list: " + Date.now()/1000);
 
     this.tree = document.getElementById("domainTree");
-    this.tree.view = domainTreeView;
+    this.tree.view = this;
 
     this.searchfield = document.getElementById("domainSearch");
 
-    Services.obs.addObserver(gChangeObserver, "cookie-changed", false);
-    Services.obs.addObserver(gChangeObserver, "perm-changed", false);
-    Services.obs.addObserver(gChangeObserver, "passwordmgr-storage-changed", false);
-    gLocSvc.cpref.addObserver(null, gChangeObserver);
-    Services.obs.addObserver(gChangeObserver, "satchel-storage-changed", false);
-
-    this.ignoreUpdate = true;
     // global "domain"
-    this.domainObjects.push({title: "*",
-                             hasPreferences: gLocSvc.cpref.getPrefs(null).enumerator.hasMoreElements(),
-                             hasFormData: true});
-
-    // add domains for all cookies we find
-    if (gDatamanDebug)
-      Services.console.logStringMessage("Add cookies to domain list: " + Date.now()/1000);
-    gCookies.loadList();
-    for (let i = 0; i < gCookies.cookies.length; i++) {
-      this.addDomainOrFlag(gCookies.cookies[i].rawHost, "hasCookies");
-    }
-
-    // add domains for permissions
-    if (gDatamanDebug)
-      Services.console.logStringMessage("Add permissions to domain list: " + Date.now()/1000);
-    let enumerator = Services.perms.enumerator;
-    while (enumerator.hasMoreElements()) {
-      let nextPermission = enumerator.getNext();
-      nextPermission = nextPermission.QueryInterface(Components.interfaces.nsIPermission);
-      this.addDomainOrFlag(nextPermission.host.replace(/^\./, ""), "hasPermissions");
-    }
-    // add domains for password rejects to permissions
-    if (gDatamanDebug)
-      Services.console.logStringMessage("Add pwd reject permissions to domain list: " + Date.now()/1000);
-    let rejectHosts = gLocSvc.pwd.getAllDisabledHosts();
-    for (let i = 0; i < rejectHosts.length; i++) {
-      this.addDomainOrFlag(rejectHosts[i], "hasPermissions");
-    }
-
-    // add domains for content prefs
-    if (gDatamanDebug)
-      Services.console.logStringMessage("Add content prefs to domain list: " + Date.now()/1000);
-    try {
-      var statement = gLocSvc.cpref.DBConnection.createStatement("SELECT groups.name AS host FROM groups");
-      while (statement.executeStep()) {
-        this.addDomainOrFlag(statement.row["host"], "hasPreferences");
-      }
-    }
-    finally {
-      statement.reset();
-    }
-
-    // add domains for passwords
-    if (gDatamanDebug)
-      Services.console.logStringMessage("Add passwords to domain list: " + Date.now()/1000);
-    gPasswords.loadList();
-    for (let i = 0; i < gPasswords.allSignons.length; i++) {
-      this.addDomainOrFlag(gPasswords.allSignons[i].hostname, "hasPasswords");
-    }
-
-    if (gDatamanDebug)
-      Services.console.logStringMessage("Finalize domain list: " + Date.now()/1000);
-    this.ignoreUpdate = false;
+    this.domainObjects["*"] = {title: "*",
+                               hasPreferences: Services.contentPrefs.getPrefs(null).enumerator.hasMoreElements(),
+                               hasFormData: true};
     this.search("");
     this.tree.view.selection.select(0);
-    gTabs.formdataTab.focus();
 
-    if (gDatamanDebug)
-      Services.console.logStringMessage("Domain list built: " + Date.now()/1000);
+    let loaderInstance;
+    function nextStep() {
+      loaderInstance.next();
+    }
+    function loader() {
+      // add domains for all cookies we find
+      gDataman.debugMsg("Add cookies to domain list: " + Date.now()/1000);
+      gDomains.ignoreUpdate = true;
+      gCookies.loadList();
+      for (let i = 0; i < gCookies.cookies.length; i++)
+        gDomains.addDomainOrFlag(gCookies.cookies[i].rawHost, "hasCookies");
+      gDomains.ignoreUpdate = false;
+      gDomains.search(gDomains.searchfield.value);
+      yield setTimeout(nextStep, 0);
+
+      // add domains for permissions
+      gDataman.debugMsg("Add permissions to domain list: " + Date.now()/1000);
+      gDomains.ignoreUpdate = true;
+      let enumerator = Services.perms.enumerator;
+      while (enumerator.hasMoreElements()) {
+        let nextPermission = enumerator.getNext().QueryInterface(Components.interfaces.nsIPermission);
+        gDomains.addDomainOrFlag(nextPermission.host.replace(/^\./, ""), "hasPermissions");
+      }
+      gDomains.ignoreUpdate = false;
+      gDomains.search(gDomains.searchfield.value);
+      yield setTimeout(nextStep, 0);
+
+      // add domains for password rejects to permissions
+      gDataman.debugMsg("Add pwd reject permissions to domain list: " + Date.now()/1000);
+      gDomains.ignoreUpdate = true;
+      let rejectHosts = gLocSvc.pwd.getAllDisabledHosts();
+      for (let i = 0; i < rejectHosts.length; i++)
+        gDomains.addDomainOrFlag(rejectHosts[i], "hasPermissions");
+      gDomains.ignoreUpdate = false;
+      gDomains.search(gDomains.searchfield.value);
+      yield setTimeout(nextStep, 0);
+
+      // add domains for content prefs
+      gDataman.debugMsg("Add content prefs to domain list: " + Date.now()/1000);
+      gDomains.ignoreUpdate = true;
+      try {
+        var statement = Services.contentPrefs.DBConnection.createStatement("SELECT groups.name AS host FROM groups");
+        while (statement.executeStep())
+          gDomains.addDomainOrFlag(statement.row["host"], "hasPreferences");
+      }
+      finally {
+        statement.reset();
+      }
+      gDomains.ignoreUpdate = false;
+      gDomains.search(gDomains.searchfield.value);
+      yield setTimeout(nextStep, 0);
+
+      // add domains for passwords
+      gDataman.debugMsg("Add passwords to domain list: " + Date.now()/1000);
+      gDomains.ignoreUpdate = true;
+      gPasswords.loadList();
+      for (let i = 0; i < gPasswords.allSignons.length; i++) {
+        gDomains.addDomainOrFlag(gPasswords.allSignons[i].hostname, "hasPasswords");
+      }
+      gDomains.ignoreUpdate = false;
+      gDomains.search(gDomains.searchfield.value);
+      yield setTimeout(nextStep, 0);
+
+      // Send a notification that we finished
+      gDataman.debugMsg("Domain list built: " + Date.now()/1000);
+      Services.obs.notifyObservers(window, "dataman-loaded", null);
+      yield;
+    }
+    loaderInstance = loader();
+    setTimeout(nextStep, 0);
   },
 
   shutdown: function domain_shutdown() {
-    Services.obs.removeObserver(gChangeObserver, "cookie-changed");
-    Services.obs.removeObserver(gChangeObserver, "perm-changed");
-    Services.obs.removeObserver(gChangeObserver, "passwordmgr-storage-changed");
-    gLocSvc.cpref.removeObserver(null, gChangeObserver);
-    Services.obs.removeObserver(gChangeObserver, "satchel-storage-changed");
+    gTabs.shutdown();
+    this.tree.view = null;
   },
 
   _getObjID: function domain__getObjID(aIdx) {
@@ -233,10 +326,13 @@ var gDomains = {
 
   getDomainFromHost: function domain_getDomainFromHost(aHostname) {
     // find the base domain name for the given host name
-    var cache_idx = this.xlcache_hosts.indexOf(aHostname);
-    if (cache_idx < 0) {
-      // return vars for nsIURLParser must all be objects
-      // see bug 568997 for improvements to that interface
+    if (!this.xlcache[aHostname]) {
+      // aHostname is not always an actual host name, but potentially something
+      // URI-like, e.g. gopher://example.com and newURI doesn't work there as we
+      // need to display entries for schemes that are not supported (any more).
+      // nsIURLParser is a fast way to generically ensure a pure host name.
+      // Return vars for nsIURLParser must all be objects,
+      // see bug 568997 for improvements to that interface.
       var schemePos = {}, schemeLen = {}, authPos = {}, authLen = {}, pathPos = {},
           pathLen = {}, usernamePos = {}, usernameLen = {}, passwordPos = {},
           passwordLen = {}, hostnamePos = {}, hostnameLen = {}, port = {};
@@ -254,11 +350,10 @@ var gDomains = {
       catch (e) {
         domain = hostName;
       }
-      this.xlcache_hosts.push(aHostname);
-      this.xlcache_domains.push(domain);
-      cache_idx = this.xlcache_hosts.length - 1;
+      this.xlcache[aHostname] = domain;
+      gDataman.debugMsg("cached: " + aHostname + " -> " + this.xlcache[aHostname]);
     }
-    return this.xlcache_domains[cache_idx];
+    return this.xlcache[aHostname];
   },
 
   hostMatchesSelected: function domain_hostMatchesSelected(aHostname) {
@@ -268,28 +363,19 @@ var gDomains = {
   addDomainOrFlag: function domain_addDomainOrFlag(aHostname, aFlag) {
     // for existing domains, add flags, for others, add them to the object
     let domain = this.getDomainFromHost(aHostname);
-    let idx = -1, domAdded = false;
-    if (!this.domainObjects.some(
-          function(aElement, aIndex, aArray) {
-            if (aElement && aElement.title == domain) {
-              aArray[aIndex][aFlag] = true;
-              idx = aIndex;
-            }
-            return aElement && aElement.title == domain;
-          })) {
-      let domObj = {title: domain};
-      domObj[aFlag] = true;
-      this.domainObjects.push(domObj);
-      idx = this.domainObjects.length - 1;
-      domAdded = true;
-    }
-    if (idx >= 0 && !this.ignoreUpdate) {
-      if (domAdded)
+    if (!this.domainObjects[domain]) {
+      this.domainObjects[domain] = {title: domain};
+      this.domainObjects[domain][aFlag] = true;
+      gDataman.debugMsg("added domain: " + domain + " (with flag " + aFlag + ")");
+      if (!this.ignoreUpdate)
         this.search(this.searchfield.value);
-      else if (domain == this.selectedDomain.title) {
-        this.ignoreUpdate = true;
-        this.select();
-        this.ignoreUpdate = false;
+    }
+    else if (!this.domainObjects[domain][aFlag]) {
+      this.domainObjects[domain][aFlag] = true;
+      gDataman.debugMsg("added flag " + aFlag + " to " + domain);
+      if (domain == this.selectedDomain.title) {
+        // Just update the tab states.
+        this.select({aNoTabSelect: true});
       }
     }
   },
@@ -297,31 +383,27 @@ var gDomains = {
   removeDomainOrFlag: function domain_removeDomainOrFlag(aDomain, aFlag) {
     // remove a flag from the given domain,
     // remove the whole domain if it doesn't have any flags left
-    var selectionCache = gDatamanUtils.getSelectedIDs(this.tree, this._getObjID);
+    if (!this.domainObjects[aDomain])
+      return;
+
+    var selectionCache = gDataman.getSelectedIDs(this.tree, this._getObjID);
     this.tree.view.selection.clearSelection();
-    let idx = -1;
-    for (let i = 0; i < this.domainObjects.length; i++) {
-      if (this.domainObjects[i] &&
-          this.domainObjects[i].title == aDomain) {
-        idx = i;
-        break;
-      }
-    }
-    this.domainObjects[idx][aFlag] = false
-    if (!this.domainObjects[idx].hasCookies &&
-        !this.domainObjects[idx].hasPermissions &&
-        !this.domainObjects[idx].hasPreferences &&
-        !this.domainObjects[idx].hasPasswords &&
-        !this.domainObjects[idx].hasFormData) {
-      this.domainObjects[idx] = null;
+    gDataman.debugMsg("removed flag " + aFlag + " from " + aDomain);
+    this.domainObjects[aDomain][aFlag] = false;
+    if (!this.domainObjects[aDomain].hasCookies &&
+        !this.domainObjects[aDomain].hasPermissions &&
+        !this.domainObjects[aDomain].hasPreferences &&
+        !this.domainObjects[aDomain].hasPasswords &&
+        !this.domainObjects[aDomain].hasFormData) {
+      gDataman.debugMsg("removed domain: " + aDomain);
+      this.domainObjects[aDomain] = null;
       this.search(this.searchfield.value);
     }
     else {
-      this.ignoreUpdate = true;
-      this.select();
-      this.ignoreUpdate = false;
+      // Just update the tab states.
+      this.select({aNoTabSelect: true});
     }
-    gDatamanUtils.restoreSelectionFromIDs(this.tree, this._getObjID,
+    gDataman.restoreSelectionFromIDs(this.tree, this._getObjID,
                                           selectionCache);
     // make sure we clear the data pane when selection has been removed
     if (!this.tree.view.selection.count && selectionCache.length)
@@ -332,47 +414,46 @@ var gDomains = {
     // Reset a flag to be only set on a specific set of domains,
     // purging then-emtpy domain in the process.
     // Needed when we need to reload a complete set of items.
+    gDataman.debugMsg("resetting domains for flag: " + aFlag);
     this.ignoreSelect = true;
-    var selectionCache = gDatamanUtils.getSelectedIDs(this.tree, this._getObjID);
+    var selectionCache = gDataman.getSelectedIDs(this.tree, this._getObjID);
     this.tree.view.selection.clearSelection();
     // First, clear all domains of this flag.
-    for (let i = 0; i < this.domainObjects.length; i++) {
-      this.domainObjects[i][aFlag] = false;
+    for (let domain in this.domainObjects) {
+      if (this.domainObjects[domain])
+        this.domainObjects[domain][aFlag] = false;
     }
     // Then, set it again on all domains in the new list.
     for (let i = 0; i < aDomainList.length; i++) {
       this.addDomainOrFlag(aDomainList[i], aFlag);
     }
-    // Now, purge all empty doamins.
-    for (let i = 0; i < this.domainObjects.length; i++) {
-      if (!this.domainObjects[i].hasCookies &&
-          !this.domainObjects[i].hasPermissions &&
-          !this.domainObjects[i].hasPreferences &&
-          !this.domainObjects[i].hasPasswords &&
-          !this.domainObjects[i].hasFormData) {
-        this.domainObjects[i] = null;
+    // Now, purge all empty domains.
+    for (let domain in this.domainObjects) {
+      if (!this.domainObjects[domain].hasCookies &&
+          !this.domainObjects[domain].hasPermissions &&
+          !this.domainObjects[domain].hasPreferences &&
+          !this.domainObjects[domain].hasPasswords &&
+          !this.domainObjects[domain].hasFormData) {
+        this.domainObjects[domain] = null;
       }
     }
     this.search(this.searchfield.value);
     this.ignoreSelect = false;
-    this.ignoreUpdate = true;
-    gDatamanUtils.restoreSelectionFromIDs(this.tree, this._getObjID,
+    gDataman.restoreSelectionFromIDs(this.tree, this._getObjID,
                                           selectionCache);
-    this.ignoreUpdate = false;
     // make sure we clear the data pane when selection has been removed
     if (!this.tree.view.selection.count && selectionCache.length)
       this.select();
   },
 
-  select: function domain_select() {
+  select: function domain_select(aNoTabSelect) {
     if (this.ignoreSelect) {
       if (this.tree.view.selection.count == 1)
         this.selectedDomain = this.domainObjects[this.displayedDomains[this.tree.currentIndex]];
       return;
     }
 
-    if (gDatamanDebug)
-      Services.console.logStringMessage("Domain selected: " + Date.now()/1000);
+    gDataman.debugMsg("Domain selected: " + Date.now()/1000);
 
     if (!this.tree.view.selection.count) {
       gTabs.cookiesTab.disabled = true;
@@ -383,15 +464,16 @@ var gDomains = {
       gTabs.formdataTab.disabled = true;
       gTabs.forgetTab.hidden = true;
       gTabs.forgetTab.disabled = true;
-      gTabs.select();
-      this.selectedDomain = {title: false};
+      gTabs.shutdown();
+      this.selectedDomain = {title: null};
+      gDataman.debugMsg("Domain select aborted (no selection)");
       return;
     }
 
     if (this.tree.view.selection.count > 1) {
-      Components.utils.reportError("Data Manager doesn't support anything but one selected domain");
+      gDataman.debugError("Data Manager doesn't support anything but one selected domain");
       this.tree.view.selection.clearSelection();
-      this.selectedDomain = {title: false};
+      this.selectedDomain = {title: null};
       return;
     }
     this.selectedDomain = this.domainObjects[this.displayedDomains[this.tree.currentIndex]];
@@ -402,20 +484,25 @@ var gDomains = {
     gTabs.passwordsTab.disabled = !this.selectedDomain.hasPasswords;
     gTabs.formdataTab.hidden = !this.selectedDomain.hasFormData;
     gTabs.formdataTab.disabled = !this.selectedDomain.hasFormData;
+    gTabs.forgetTab.disabled = true;
     gTabs.forgetTab.hidden = true;
-    let prevtab = gTabs.tabbox.selectedTab || gTabs.cookiesTab;
-    let stoptab = null;
-    while (gTabs.tabbox.selectedTab != stoptab &&
-           (gTabs.tabbox.selectedTab.disabled || gTabs.tabbox.selectedTab.hidden)) {
-      gTabs.tabbox.tabs.advanceSelectedTab(1, true);
-      if (!stoptab)
-        stoptab = prevtab;
+    // switch to the first non-disabled tab if the one that's showing is
+    // disabled, otherwise, you can't use the keyboard to switch tabs
+    if (gTabs.tabbox.selectedTab.disabled) {
+      for (let i = 0; i < gTabs.tabbox.tabs.childNodes.length; ++i) {
+        if (!gTabs.tabbox.tabs.childNodes[i].disabled) {
+          gTabs.tabbox.selectedIndex = i;
+          break;
+        }
+      }
     }
-    if (!this.ignoreUpdate)
+    if (!aNoTabSelect)
       gTabs.select();
 
-    if (gDatamanDebug)
-      Services.console.logStringMessage("Domain select finished: " + Date.now()/1000);
+    // Ensure the focus stays on our tree.
+    this.tree.focus();
+
+    gDataman.debugMsg("Domain select finished: " + Date.now()/1000);
   },
 
   handleKeyPress: function domain_handleKeyPress(aEvent) {
@@ -427,8 +514,8 @@ var gDomains = {
   sort: function domain_sort() {
     // Compare function for two domain items
     let compfunc = function domain_sort_compare(aOne, aTwo) {
-      return (gDomains.domainObjects[aOne].title
-              .localeCompare(gDomains.domainObjects[aTwo].title));
+      return gDomains.domainObjects[aOne].title
+                     .localeCompare(gDomains.domainObjects[aTwo].title);
     };
 
     // Do the actual sorting of the array
@@ -438,23 +525,25 @@ var gDomains = {
 
   forget: function domain_forget() {
     gTabs.forgetTab.hidden = false;
+    gTabs.forgetTab.disabled = false;
     gTabs.tabbox.selectedTab = gTabs.forgetTab;
   },
 
   search: function domain_search(aSearchString) {
     this.ignoreSelect = true;
-    var selectionCache = gDatamanUtils.getSelectedIDs(this.tree, this._getObjID);
+    var selectionCache = gDataman.getSelectedIDs(this.tree, this._getObjID);
     this.tree.view.selection.clearSelection();
     this.tree.treeBoxObject.beginUpdateBatch();
     this.displayedDomains = [];
-    for (let i = 0; i < this.domainObjects.length; i++) {
-      if (this.domainObjects[i] &&
-          this.domainObjects[i].title.toLocaleLowerCase().indexOf(aSearchString) != -1)
-        this.displayedDomains.push(i);
+    var lcSearch = aSearchString.toLocaleLowerCase();
+    for (let domain in this.domainObjects) {
+      if (this.domainObjects[domain] &&
+          domain.toLocaleLowerCase().indexOf(lcSearch) != -1)
+        this.displayedDomains.push(domain);
     }
-    this.tree.treeBoxObject.endUpdateBatch();
     this.sort();
-    gDatamanUtils.restoreSelectionFromIDs(this.tree, this._getObjID,
+    this.tree.treeBoxObject.endUpdateBatch();
+    gDataman.restoreSelectionFromIDs(this.tree, this._getObjID,
                                           selectionCache);
     this.ignoreSelect = false;
     // make sure we clear the data pane when selection has been removed
@@ -469,41 +558,31 @@ var gDomains = {
   updateContext: function domain_updateContext() {
     let forgetCtx = document.getElementById("domain-context-forget");
     forgetCtx.disabled = !this.selectedDomain.title;
-    forgetCtx.label = (this.selectedDomain.title == "*") ?
+    forgetCtx.label = this.selectedDomain.title == "*" ?
                       forgetCtx.getAttribute("label_global") :
                       forgetCtx.getAttribute("label_domain");
-    forgetCtx.accesskey = (this.selectedDomain.title == "*") ?
+    forgetCtx.accesskey = this.selectedDomain.title == "*" ?
                           forgetCtx.getAttribute("accesskey_global") :
                           forgetCtx.getAttribute("accesskey_domain");
   },
-};
 
-var domainTreeView = {
+  // nsITreeView
+  __proto__: gBaseTreeView,
   get rowCount() {
-    return gDomains.displayedDomains.length;
+    return this.displayedDomains.length;
   },
-  setTree: function(aTree) {},
-  getImageSrc: function(aRow, aColumn) {},
-  getProgressMode: function(aRow, aColumn) {},
-  getCellValue: function(aRow, aColumn) {},
   getCellText: function(aRow, aColumn) {
     switch (aColumn.id) {
       case "domainCol":
-        return gDomains.domainObjects[gDomains.displayedDomains[aRow]].title;
+        return this.domainObjects[this.displayedDomains[aRow]].title;
     }
   },
-  isSeparator: function(aIndex) { return false; },
-  isSorted: function() { return false; },
-  isContainer: function(aIndex) { return false; },
-  cycleHeader: function(aCol) {},
-  getRowProperties: function(aRow, aProp) {},
-  getColumnProperties: function(aColumn, aProp) {},
-  getCellProperties: function(aRow, aColumn, aProp) {}
 };
 
-
+// :::::::::::::::::::: tab management ::::::::::::::::::::
 var gTabs = {
   tabbox: null,
+  tabs: null,
   cookiesTab: null,
   permissionsTab: null,
   preferencesTab: null,
@@ -511,9 +590,11 @@ var gTabs = {
   formdataTab: null,
   forgetTab: null,
 
+  panels: {},
   activePanel: null,
 
   initialize: function tabs_initialize() {
+    gDataman.debugMsg("Initializing tabs");
     this.tabbox = document.getElementById("tabbox");
     this.cookiesTab = document.getElementById("cookiesTab");
     this.permissionsTab = document.getElementById("permissionsTab");
@@ -521,87 +602,59 @@ var gTabs = {
     this.passwordsTab = document.getElementById("passwordsTab");
     this.formdataTab = document.getElementById("formdataTab");
     this.forgetTab = document.getElementById("forgetTab");
+
+    this.panels = {
+      cookiesPanel: gCookies,
+      permissionsPanel: gPerms,
+      preferencesPanel: gPrefs,
+      passwordsPanel: gPasswords,
+      formdataPanel: gFormdata,
+      forgetPanel: gForget
+    };
+  },
+
+  shutdown: function tabs_shutdown() {
+    gDataman.debugMsg("Shutting down tabs");
+    if (this.activePanel) {
+      this.panels[this.activePanel].shutdown();
+      this.activePanel = null;
+    }
   },
 
   select: function tabs_select() {
+    gDataman.debugMsg("Selecting tab");
     if (this.activePanel) {
-      switch (this.activePanel) {
-        case "cookiesPanel":
-          gCookies.shutdown();
-          break;
-        case "permissionsPanel":
-          gPerms.shutdown();
-          break;
-        case "preferencesPanel":
-          gPrefs.shutdown();
-          break;
-        case "passwordsPanel":
-          gPasswords.shutdown();
-          break;
-        case "formdataPanel":
-          gFormdata.shutdown();
-          break;
-        case "forgetPanel":
-          this.forgetTab.hidden = true;
-          gForget.shutdown();
-          break;
-      }
+      this.panels[this.activePanel].shutdown();
       this.activePanel = null;
     }
 
-    if (!this.tabbox)
+    if (!this.tabbox || this.tabbox.selectedPanel.disabled)
       return;
 
-    switch (this.tabbox.selectedPanel.id) {
-      case "cookiesPanel":
-        gCookies.initialize();
-        break;
-      case "permissionsPanel":
-        gPerms.initialize();
-        break;
-      case "preferencesPanel":
-        gPrefs.initialize();
-        break;
-      case "passwordsPanel":
-        gPasswords.initialize();
-        break;
-      case "formdataPanel":
-        gFormdata.initialize();
-        break;
-      case "forgetPanel":
-        gForget.initialize();
-        break;
-    }
     this.activePanel = this.tabbox.selectedPanel.id;
+    this.panels[this.activePanel].initialize();
   },
 
   selectAll: function tabs_selectAll() {
-    switch (this.activePanel) {
-      case "cookiesPanel":
-        gCookies.selectAll();
-        break;
-      case "preferencesPanel":
-        gPrefs.selectAll();
-        break;
-      case "passwordsPanel":
-        gPasswords.selectAll();
-        break;
-      case "formdataPanel":
-        gFormdata.selectAll();
-        break;
+    try {
+      this.panels[this.activePanel].selectAll();
+    }
+    catch (e) {
+       gDataman.debugError("SelectAll didn't work for " + this.activePanel + ": " + e);
     }
   },
 
   focusSearch: function tabs_focusSearch() {
-    switch (this.activePanel) {
-      case "formdataPanel":
-        gFormdata.focusSearch();
-        break;
+    try {
+      this.panels[this.activePanel].focusSearch();
+    }
+    catch (e) {
+      gDataman.debugError("focusSearch didn't work for " + this.activePanel + ": " + e);
     }
   },
 };
 
-
+// :::::::::::::::::::: cookies panel ::::::::::::::::::::
 var gCookies = {
   tree: null,
   cookieInfoName: null,
@@ -618,8 +671,9 @@ var gCookies = {
   displayedCookies: [],
 
   initialize: function cookies_initialize() {
+    gDataman.debugMsg("Initializing cookies panel");
     this.tree = document.getElementById("cookiesTree");
-    this.tree.view = cookieTreeView;
+    this.tree.view = this;
 
     this.cookieInfoName = document.getElementById("cookieInfoName");
     this.cookieInfoValue = document.getElementById("cookieInfoValue");
@@ -646,6 +700,7 @@ var gCookies = {
   },
 
   shutdown: function cookies_shutdown() {
+    gDataman.debugMsg("Shutting down cookies panel");
     this.tree.view.selection.clearSelection();
     this.tree.view = null;
     this.displayedCookies = [];
@@ -700,11 +755,11 @@ var gCookies = {
       }
       return expiry;
     }
-    return gDatamanBundle.getString("cookies.expireAtEndOfSession");
+    return gDataman.bundle.getString("cookies.expireAtEndOfSession");
   },
 
   select: function cookies_select() {
-    var selections = gDatamanUtils.getTreeSelections(this.tree);
+    var selections = gDataman.getTreeSelections(this.tree);
     this.removeButton.disabled = !selections.length;
     if (!selections.length) {
       this._clearCookieInfo();
@@ -729,7 +784,7 @@ var gCookies = {
     var typestringID = "cookies." +
                        (showCookie.isSecure ? "secureOnly" : "anyConnection") +
                        (showCookie.isHttpOnly ? ".httponly" : ".all");
-    this.cookieInfoSendType.value = gDatamanBundle.getString(typestringID);
+    this.cookieInfoSendType.value = gDataman.bundle.getString(typestringID);
     this.cookieInfoExpires.value = showCookie.expires;
     return true;
   },
@@ -798,7 +853,7 @@ var gCookies = {
     };
 
     if (aUpdateSelection) {
-      var selectionCache = gDatamanUtils.getSelectedIDs(this.tree, this._getObjID);
+      var selectionCache = gDataman.getSelectedIDs(this.tree, this._getObjID);
     }
     this.tree.view.selection.clearSelection();
 
@@ -807,7 +862,7 @@ var gCookies = {
     this.tree.treeBoxObject.invalidate();
 
     if (aUpdateSelection) {
-      gDatamanUtils.restoreSelectionFromIDs(this.tree, this._getObjID,
+      gDataman.restoreSelectionFromIDs(this.tree, this._getObjID,
                                             selectionCache);
     }
 
@@ -817,15 +872,15 @@ var gCookies = {
   },
 
   delete: function cookies_delete() {
-    var selections = gDatamanUtils.getTreeSelections(this.tree);
+    var selections = gDataman.getTreeSelections(this.tree);
 
     if (selections.length > 1) {
-      let title = gDatamanBundle.getString("cookies.deleteSelectedTitle");
-      let msg = gDatamanBundle.getString("cookies.deleteSelected");
+      let title = gDataman.bundle.getString("cookies.deleteSelectedTitle");
+      let msg = gDataman.bundle.getString("cookies.deleteSelected");
       let flags = ((Services.prompt.BUTTON_TITLE_IS_STRING * Services.prompt.BUTTON_POS_0) +
                    (Services.prompt.BUTTON_TITLE_CANCEL * Services.prompt.BUTTON_POS_1) +
                    Services.prompt.BUTTON_POS_1_DEFAULT)
-      let yes = gDatamanBundle.getString("cookies.deleteSelectedYes");
+      let yes = gDataman.bundle.getString("cookies.deleteSelectedYes");
       if (Services.prompt.confirmEx(window, title, msg, flags, yes, null, null,
                                     null, {value: 0}) == 1) // 1=="Cancel" button
         return;
@@ -852,15 +907,15 @@ var gCookies = {
       (this.tree.view.selection.count >= this.tree.view.rowCount);
   },
 
-  reactToChange: function cookies_reactToChange(aSubject, aState) {
-    // aState: added, changed, deleted, batch-deleted, cleared, reload
+  reactToChange: function cookies_reactToChange(aSubject, aData) {
+    // aData: added, changed, deleted, batch-deleted, cleared, reload
     // see http://mxr.mozilla.org/mozilla-central/source/netwerk/cookie/nsICookieService.idl
-    if (aState == "batch-deleted" || aState == "cleared" || aState == "reload") {
+    if (aData == "batch-deleted" || aData == "cleared" || aData == "reload") {
       // Go for re-parsing the whole thing, as cleared and reload need that anyhow
       // (batch-deleted has an nsIArray of cookies, we could in theory do better there)
       var selectionCache = [];
       if (this.displayedCookies.length) {
-        selectionCache = gDatamanUtils.getSelectedIDs(this.tree, this._getObjID);
+        selectionCache = gDataman.getSelectedIDs(this.tree, this._getObjID);
         this.displayedCookies = [];
       }
       this.loadList();
@@ -883,7 +938,7 @@ var gCookies = {
         this.sort(null, false, false);
         this.tree.treeBoxObject.endUpdateBatch();
         this.tree.treeBoxObject.invalidate();
-        gDatamanUtils.restoreSelectionFromIDs(this.tree, this._getObjID,
+        gDataman.restoreSelectionFromIDs(this.tree, this._getObjID,
                                               selectionCache);
       }
       return;
@@ -895,7 +950,7 @@ var gCookies = {
     // Does change affect possibly loaded Cookies pane?
     let affectsLoaded = this.displayedCookies.length &&
                         gDomains.hostMatchesSelected(aSubject.rawHost);
-    if (aState == "added") {
+    if (aData == "added") {
       this.cookies.push(this._makeCookieObject(aSubject));
       if (affectsLoaded) {
         this.displayedCookies.push(this.cookies.length - 1);
@@ -907,7 +962,7 @@ var gCookies = {
       }
     }
     else {
-      idx = -1; disp_idx = -1; domainCookies = 0;
+      let idx = -1; disp_idx = -1; domainCookies = 0;
       if (affectsLoaded) {
         for (let i = 0; i < this.displayedCookies.length; i++) {
           let cookie = this.cookies[this.displayedCookies[i]];
@@ -917,7 +972,7 @@ var gCookies = {
             break;
           }
         }
-        if (aState == "deleted")
+        if (aData == "deleted")
           domainCookies = this.displayedCookies.length;
       }
       else {
@@ -926,21 +981,21 @@ var gCookies = {
           if (cookie && cookie.host == aSubject.host &&
               cookie.name == aSubject.name && cookie.path == aSubject.path) {
             idx = i;
-            if (aState != "deleted")
+            if (aData != "deleted")
               break;
           }
-          if (aState == "deleted" &&
+          if (aData == "deleted" &&
               gDomains.getDomainFromHost(cookie.rawHost) == domain)
             domainCookies++;
         }
       }
       if (idx >= 0) {
-        if (aState == "changed") {
+        if (aData == "changed") {
           this.cookies[idx] = this._makeCookieObject(aSubject);
           if (affectsLoaded)
             this.tree.treeBoxObject.invalidateRow(disp_idx);
         }
-        else if (aState == "deleted") {
+        else if (aData == "deleted") {
           this.cookies[idx] = null;
           if (affectsLoaded) {
             this.displayedCookies.splice(disp_idx, 1);
@@ -962,19 +1017,16 @@ var gCookies = {
         this.cookies[i] = null;
       }
     }
+    gDomains.removeDomainOrFlag(gDomains.selectedDomain.title, "hasCookies");
   },
-};
 
-var cookieTreeView = {
+  // nsITreeView
+  __proto__: gBaseTreeView,
   get rowCount() {
-    return gCookies.displayedCookies.length;
+    return this.displayedCookies.length;
   },
-  setTree: function(aTree) {},
-  getImageSrc: function(aRow, aColumn) {},
-  getProgressMode: function(aRow, aColumn) {},
-  getCellValue: function(aRow, aColumn) {},
   getCellText: function(aRow, aColumn) {
-    let cookie = gCookies.cookies[gCookies.displayedCookies[aRow]];
+    let cookie = this.cookies[this.displayedCookies[aRow]];
     switch (aColumn.id) {
       case "cookieHostCol":
         return cookie.rawHost;
@@ -984,35 +1036,28 @@ var cookieTreeView = {
         return cookie.expires;
     }
   },
-  isSeparator: function(aIndex) { return false; },
-  isSorted: function() { return false; },
-  isContainer: function(aIndex) { return false; },
-  cycleHeader: function(aCol) {},
-  getRowProperties: function(aRow, aProp) {},
-  getColumnProperties: function(aColumn, aProp) {},
-  getCellProperties: function(aRow, aColumn, aProp) {}
 };
 
-
+// :::::::::::::::::::: permissions panel ::::::::::::::::::::
 var gPerms = {
   list: null,
 
   initialize: function() {
+    gDataman.debugMsg("Initializing permissions panel");
     this.list = document.getElementById("permList");
 
     let enumerator = Services.perms.enumerator;
     while (enumerator.hasMoreElements()) {
       let nextPermission = enumerator.getNext();
       nextPermission = nextPermission.QueryInterface(Components.interfaces.nsIPermission);
-      let host = nextPermission.host;
-      if (gDomains.hostMatchesSelected(host.replace(/^\./, ""))) {
+      let rawHost = nextPermission.host.replace(/^\./, "");
+      if (gDomains.hostMatchesSelected(rawHost)) {
         let permElem = document.createElement("richlistitem");
         permElem.setAttribute("type", nextPermission.type);
-        permElem.setAttribute("host", host);
-        permElem.setAttribute("rawHost", (host.charAt(0) == ".") ? host.substring(1, host.length) : host);
+        permElem.setAttribute("host", nextPermission.host);
+        permElem.setAttribute("rawHost", rawHost);
         permElem.setAttribute("capability", nextPermission.capability);
         permElem.setAttribute("class", "permission");
-        permElem.setAttribute("orient", "vertical");
         this.list.appendChild(permElem);
       }
     }
@@ -1024,17 +1069,19 @@ var gPerms = {
         permElem.setAttribute("type", "password");
         permElem.setAttribute("host", rejectHosts[i]);
         permElem.setAttribute("rawHost", gDomains.getDomainFromHost(rejectHosts[i]));
-        permElem.setAttribute("capability", 2);
+        permElem.setAttribute("capability", Services.perms.DENY_ACTION);
         permElem.setAttribute("class", "permission");
-        permElem.setAttribute("orient", "vertical");
         this.list.appendChild(permElem);
       }
     }
   },
 
   shutdown: function() {
+    gDataman.debugMsg("Shutting down permissions panel");
+    // XXX: Here we could detect if we still hold any non-default settings and
+    //      trigger the removeDomainOrFlag if not.
     while (this.list.hasChildNodes())
-      this.list.removeChild(this.list.firstChild);
+      this.list.removeChild(this.list.lastChild);
   },
 
   // Most functions of permissions are in the XBL items!
@@ -1067,9 +1114,9 @@ var gPerms = {
     return false;
   },
 
-  reactToChange: function permissions_reactToChange(aSubject, aState) {
-    if (/^hostSaving/.test(aState)) {
-      // aState: hostSavingEnabled, hostSavingDisabled
+  reactToChange: function permissions_reactToChange(aSubject, aData) {
+    if (/^hostSaving/.test(aData)) {
+      // aData: hostSavingEnabled, hostSavingDisabled
       aSubject.QueryInterface(Components.interfaces.nsISupportsString);
       let domain = gDomains.getDomainFromHost(aSubject.data);
       // Does change affect possibly loaded Preferences pane?
@@ -1084,7 +1131,7 @@ var gPerms = {
             permElem = elem;
         }
       }
-      if (aState == "hostSavingEnabled") {
+      if (aData == "hostSavingEnabled") {
         if (affectsLoaded) {
           if (permElem.capability != Services.perms.ALLOW_ACTION)
             permElem.setCapability(Services.perms.ALLOW_ACTION);
@@ -1108,7 +1155,7 @@ var gPerms = {
             gDomains.removeDomainOrFlag(domain, "hasPermissions");
         }
       }
-      else if (aState == "hostSavingDisabled") {
+      else if (aData == "hostSavingDisabled") {
         if (affectsLoaded) {
           if (permElem) {
             if (permElem.capability != Services.perms.DENY_ACTION)
@@ -1129,9 +1176,9 @@ var gPerms = {
       }
     }
     else {
-      // aState: added, changed, deleted, cleared
+      // aData: added, changed, deleted, cleared
       // See http://mxr.mozilla.org/mozilla-central/source/netwerk/base/public/nsIPermissionManager.idl
-      if (aState == "cleared") {
+      if (aData == "cleared") {
         let domainList = [];
         // Blocked passwords still belong in the list.
         let rejectHosts = gLocSvc.pwd.getAllDisabledHosts();
@@ -1144,10 +1191,11 @@ var gPerms = {
         return;
       }
       aSubject.QueryInterface(Components.interfaces.nsIPermission);
-      let domain = gDomains.getDomainFromHost(aSubject.host);
+      let rawHost = aSubject.host.replace(/^\./, "");
+      let domain = gDomains.getDomainFromHost(rawHost);
       // Does change affect possibly loaded Preferences pane?
       let affectsLoaded = this.list.childElementCount &&
-                          gDomains.hostMatchesSelected(aSubject.host);
+                          gDomains.hostMatchesSelected(rawHost);
       let permElem = null;
       if (affectsLoaded) {
         for (let i = 0; i < this.list.children.length; i++) {
@@ -1157,7 +1205,7 @@ var gPerms = {
             permElem = elem;
         }
       }
-      if (aState == "deleted") {
+      if (aData == "deleted") {
         if (affectsLoaded) {
           permElem.useDefault(true);
         }
@@ -1180,10 +1228,10 @@ var gPerms = {
             gDomains.removeDomainOrFlag(domain, "hasPermissions");
         }
       }
-      else if (aState == "changed" && affectsLoaded) {
+      else if (aData == "changed" && affectsLoaded) {
         permElem.setCapability(aSubject.capability);
       }
-      else if (aState == "added") {
+      else if (aData == "added") {
         if (affectsLoaded) {
           if (permElem) {
             permElem.useDefault(false);
@@ -1193,17 +1241,14 @@ var gPerms = {
             permElem = document.createElement("richlistitem");
             permElem.setAttribute("type", aSubject.type);
             permElem.setAttribute("host", aSubject.host);
-            permElem.setAttribute("rawHost",
-                                  (aSubject.host.charAt(0) == ".") ?
-                                  aSubject.host.substring(1, aSubject.host.length) :
-                                  aSubject.host);
+            permElem.setAttribute("rawHost", rawHost);
             permElem.setAttribute("capability", aSubject.capability);
             permElem.setAttribute("class", "permission");
             permElem.setAttribute("orient", "vertical");
             this.list.appendChild(permElem);
           }
         }
-        gDomains.addDomainOrFlag(aSubject.host, "hasPermissions");
+        gDomains.addDomainOrFlag(rawHost, "hasPermissions");
       }
     }
   },
@@ -1229,10 +1274,320 @@ var gPerms = {
         gLocSvc.pwd.setLoginSavingEnabled(rejectHosts[i], true);
       }
     }
+    gDomains.removeDomainOrFlag(gDomains.selectedDomain.title, "hasPermissions");
   },
 };
 
+// :::::::::::::::::::: content prefs panel ::::::::::::::::::::
+var gPrefs = {
+  tree: null,
+  removeButton: null,
 
+  prefs: [],
+  displayedPrefs: [],
+
+  initialize: function prefs_initialize() {
+    gDataman.debugMsg("Initializing prefs panel");
+    this.tree = document.getElementById("prefsTree");
+    this.tree.view = this;
+
+    this.removeButton = document.getElementById("prefsRemove");
+
+    this.tree.treeBoxObject.beginUpdateBatch();
+    // get all groups (hosts) that match the domain
+    let domain = gDomains.selectedDomain.title;
+    if (domain == "*") {
+      let enumerator = Services.contentPrefs.getPrefs(null).enumerator;
+      while (enumerator.hasMoreElements()) {
+        let pref = enumerator.getNext().QueryInterface(Components.interfaces.nsIProperty);
+        this.prefs.push({host: null, name: pref.name, value: pref.value});
+        this.displayedPrefs.push(this.prefs.length - 1);
+      }
+    }
+    else {
+      try {
+        let sql = "SELECT groups.name AS host FROM groups WHERE host = :hostName OR host LIKE :hostMatch ESCAPE '/'";
+        var statement = Services.contentPrefs.DBConnection.createStatement(sql);
+        statement.params.hostName = domain;
+        statement.params.hostMatch = "%." + statement.escapeStringForLIKE(domain, "/");
+        while (statement.executeStep()) {
+          // now, get all prefs for that host
+          let enumerator =  Services.contentPrefs.getPrefs(statement.row["host"]).enumerator;
+          while (enumerator.hasMoreElements()) {
+            let pref = enumerator.getNext().QueryInterface(Components.interfaces.nsIProperty);
+            this.prefs.push({host: statement.row["host"], name: pref.name, value: pref.value});
+            this.displayedPrefs.push(this.prefs.length - 1);
+          }
+        }
+      }
+      finally {
+        statement.reset();
+      }
+    }
+    this.sort(null, false, false);
+    this.tree.treeBoxObject.endUpdateBatch();
+    this.tree.treeBoxObject.invalidate();
+  },
+
+  shutdown: function prefs_shutdown() {
+    gDataman.debugMsg("Shutting down prefs panel");
+    this.tree.view.selection.clearSelection();
+    this.tree.view = null;
+    this.prefs = [];
+    this.displayedPrefs = [];
+  },
+
+  _getObjID: function prefs__getObjID(aIdx) {
+    var curPref = gPrefs.prefs[gPrefs.displayedPrefs[aIdx]];
+    return curPref.host + "|" + curPref.name;
+  },
+
+  select: function prefs_select() {
+    var selections = gDataman.getTreeSelections(this.tree);
+    this.removeButton.disabled = !selections.length;
+    return true;
+  },
+
+  selectAll: function prefs_selectAll() {
+    this.tree.view.selection.selectAll();
+  },
+
+  handleKeyPress: function prefs_handleKeyPress(aEvent) {
+    if (aEvent.keyCode == KeyEvent.DOM_VK_DELETE) {
+      this.delete();
+    }
+  },
+
+  sort: function prefs_sort(aColumn, aUpdateSelection, aInvertDirection) {
+    // make sure we have a valid column
+    let column = aColumn;
+    if (!column) {
+      let sortedCol = this.tree.columns.getSortedColumn();
+      if (sortedCol)
+        column = sortedCol.element;
+      else
+        column = document.getElementById("prefsHostCol");
+    }
+    else if (column.localName == "treecols" || column.localName == "splitter")
+      return;
+
+    if (!column || column.localName != "treecol") {
+      Components.utils.reportError("No column found to sort form data by");
+      return;
+    }
+
+    let dirAscending = column.getAttribute("sortDirection") !=
+                       (aInvertDirection ? "ascending" : "descending");
+    let dirFactor = dirAscending ? 1 : -1;
+
+    // Clear attributes on all columns, we're setting them again after sorting
+    for (let node = column.parentNode.firstChild; node; node = node.nextSibling) {
+      node.removeAttribute("sortActive");
+      node.removeAttribute("sortDirection");
+    }
+
+    // Compare function for two content prefs
+    let compfunc = function prefs_sort_compare(aOne, aTwo) {
+      switch (column.id) {
+        case "prefsHostCol":
+          return dirFactor * gPrefs.prefs[aOne].host
+                             .localeCompare(gPrefs.prefs[aTwo].host);
+        case "prefsNameCol":
+          return dirFactor * gPrefs.prefs[aOne].name
+                             .localeCompare(gPrefs.prefs[aTwo].name);
+        case "prefsValueCol":
+          return dirFactor * gPrefs.prefs[aOne].value
+                             .localeCompare(gPrefs.prefs[aTwo].value);
+      }
+      return 0;
+    };
+
+    if (aUpdateSelection) {
+      var selectionCache = gDataman.getSelectedIDs(this.tree, this._getObjID);
+    }
+    this.tree.view.selection.clearSelection();
+
+    // Do the actual sorting of the array
+    this.displayedPrefs.sort(compfunc);
+    this.tree.treeBoxObject.invalidate();
+
+    if (aUpdateSelection) {
+      gDataman.restoreSelectionFromIDs(this.tree, this._getObjID,
+                                            selectionCache);
+    }
+
+    // Set attributes to the sorting we did
+    column.setAttribute("sortActive", "true");
+    column.setAttribute("sortDirection", dirAscending ? "ascending" : "descending");
+  },
+
+  delete: function prefs_delete() {
+    var selections = gDataman.getTreeSelections(this.tree);
+
+    if (selections.length > 1) {
+      let title = gDataman.bundle.getString("prefs.deleteSelectedTitle");
+      let msg = gDataman.bundle.getString("prefs.deleteSelected");
+      let flags = ((Services.prompt.BUTTON_TITLE_IS_STRING * Services.prompt.BUTTON_POS_0) +
+                   (Services.prompt.BUTTON_TITLE_CANCEL * Services.prompt.BUTTON_POS_1) +
+                   Services.prompt.BUTTON_POS_1_DEFAULT)
+      let yes = gDataman.bundle.getString("prefs.deleteSelectedYes");
+      if (Services.prompt.confirmEx(window, title, msg, flags, yes, null, null,
+                                    null, {value: 0}) == 1) // 1=="Cancel" button
+        return;
+    }
+
+    this.tree.view.selection.clearSelection();
+    // Loop backwards so later indexes in the list don't change.
+    for (let i = selections.length - 1; i >= 0; i--) {
+      let delPref = this.prefs[this.displayedPrefs[selections[i]]];
+      this.prefs[this.displayedPrefs[selections[i]]] = null;
+      this.displayedPrefs.splice(selections[i], 1);
+      this.tree.treeBoxObject.rowCountChanged(selections[i], -1);
+      Services.contentPrefs.removePref(delPref.host, delPref.name);
+    }
+    if (!this.displayedPrefs.length)
+      gDomains.removeDomainOrFlag(gDomains.selectedDomain.title, "hasPreferences");
+  },
+
+  updateContext: function prefs_updateContext() {
+    document.getElementById("prefs-context-remove").disabled =
+      this.removeButton.disabled;
+    document.getElementById("prefs-context-selectall").disabled =
+      (this.tree.view.selection.count >= this.tree.view.rowCount);
+  },
+
+  reactToChange: function prefs_reactToChange(aSubject, aData) {
+    // aData: prefSet, prefRemoved
+
+    // Do "surgical" updates.
+    let domain = gDomains.getDomainFromHost(aSubject.host);
+    // Does change affect possibly loaded Preferences pane?
+    let affectsLoaded = this.displayedPrefs.length &&
+                        gDomains.hostMatchesSelected(aSubject.host);
+    let idx = -1; disp_idx = -1; domainPrefs = 0;
+    if (affectsLoaded) {
+      for (let i = 0; i < this.displayedPrefs.length; i++) {
+        let cpref = this.prefs[this.displayedPrefs[i]];
+        if (cpref && cpref.host == aSubject.host && cpref.name == aSubject.name) {
+          idx = this.displayedPrefs[i]; disp_idx = i;
+          break;
+        }
+      }
+      if (aData == "prefRemoved")
+        domainPrefs = this.displayedPrefs.length;
+    }
+    else if (aData == "prefRemoved") {
+      // See if there are any prefs left for that domain.
+      if (domain == "*") {
+        let enumerator = Services.contentPrefs.getPrefs(null).enumerator;
+        if (enumerator.hasMoreElements())
+          domainPrefs++;
+      }
+      else {
+        try {
+          let sql = "SELECT groups.name AS host FROM groups WHERE host = :hostName OR host LIKE :hostMatch ESCAPE '/'";
+          var statement = Services.contentPrefs.DBConnection.createStatement(sql);
+          statement.params.hostName = domain;
+          statement.params.hostMatch = "%." + statement.escapeStringForLIKE(domain, "/");
+          while (statement.executeStep()) {
+            // now, get all prefs for that host
+            let enumerator = Services.contentPrefs.getPrefs(statement.row["host"]).enumerator;
+            if (enumerator.hasMoreElements())
+              domainPrefs++;
+          }
+        }
+        finally {
+          statement.reset();
+        }
+      }
+      if (!domainPrefs)
+        gDomains.removeDomainOrFlag(domain, "hasPreferences");
+    }
+    if (idx >= 0) {
+      if (aData == "prefSet") {
+        this.prefs[idx] = aSubject;
+        if (affectsLoaded)
+          this.tree.treeBoxObject.invalidateRow(disp_idx);
+      }
+      else if (aData == "prefRemoved") {
+        this.prefs[idx] = null;
+        if (affectsLoaded) {
+          this.displayedPrefs.splice(disp_idx, 1);
+          this.tree.treeBoxObject.rowCountChanged(disp_idx, -1);
+        }
+        if (domainPrefs == 1)
+          gDomains.removeDomainOrFlag(domain, "hasPreferences");
+      }
+    }
+    else if (aData == "prefSet") {
+      // Pref set, no prev index known - either new or existing pref domain.
+      if (affectsLoaded) {
+        this.prefs.push(aSubject);
+        this.displayedPrefs.push(this.prefs.length - 1);
+        this.tree.treeBoxObject.rowCountChanged(this.prefs.length - 1, 1);
+        this.sort(null, true, false);
+      }
+      else {
+        gDomains.addDomainOrFlag(aSubject.host, "hasPreferences");
+      }
+    }
+  },
+
+  forget: function prefs_forget() {
+    let delPrefs = [];
+    try {
+      // get all groups (hosts) that match the domain
+      let domain = gDomains.selectedDomain.title;
+      if (domain == "*") {
+        let enumerator =  Services.contentPrefs.getPrefs(null).enumerator;
+        while (enumerator.hasMoreElements()) {
+          let pref = enumerator.getNext().QueryInterface(Components.interfaces.nsIProperty);
+          delPrefs.push({host: null, name: pref.name, value: pref.value});
+        }
+      }
+      else {
+        let sql = "SELECT groups.name AS host FROM groups WHERE host = :hostName OR host LIKE :hostMatch ESCAPE '/'";
+        var statement = Services.contentPrefs.DBConnection.createStatement(sql);
+        statement.params.hostName = domain;
+        statement.params.hostMatch = "%." + statement.escapeStringForLIKE(domain, "/");
+        while (statement.executeStep()) {
+          // now, get all prefs for that host
+          let enumerator =  Services.contentPrefs.getPrefs(statement.row["host"]).enumerator;
+          while (enumerator.hasMoreElements()) {
+            let pref = enumerator.getNext().QueryInterface(Components.interfaces.nsIProperty);
+            delPrefs.push({host: statement.row["host"], name: pref.name, value: pref.value});
+          }
+        }
+      }
+    }
+    finally {
+      statement.reset();
+    }
+    for (let i = 0; i < delPrefs.length; i++) {
+      Services.contentPrefs.removePref(delPrefs[i].host, delPrefs[i].name);
+    }
+    gDomains.removeDomainOrFlag(gDomains.selectedDomain.title, "hasPreferences");
+  },
+
+  // nsITreeView
+  __proto__: gBaseTreeView,
+  get rowCount() {
+    return this.displayedPrefs.length;
+  },
+  getCellText: function(aRow, aColumn) {
+    let cpref = this.prefs[this.displayedPrefs[aRow]];
+    switch (aColumn.id) {
+      case "prefsHostCol":
+        return cpref.host || "*";
+      case "prefsNameCol":
+        return cpref.name;
+      case "prefsValueCol":
+        return cpref.value;
+    }
+  },
+};
+
+// :::::::::::::::::::: passwords panel ::::::::::::::::::::
 var gPasswords = {
   tree: null,
   removeButton: null,
@@ -1244,13 +1599,14 @@ var gPasswords = {
   showPasswords: false,
 
   initialize: function passwords_initialize() {
+    gDataman.debugMsg("Initializing passwords panel");
     this.tree = document.getElementById("passwordsTree");
-    this.tree.view = passwordTreeView;
+    this.tree.view = this;
 
     this.removeButton = document.getElementById("pwdRemove");
     this.toggleButton = document.getElementById("pwdToggle");
-    this.toggleButton.label = gDatamanBundle.getString("pwd.showPasswords");
-    this.toggleButton.accessKey = gDatamanBundle.getString("pwd.showPasswords.accesskey");
+    this.toggleButton.label = gDataman.bundle.getString("pwd.showPasswords");
+    this.toggleButton.accessKey = gDataman.bundle.getString("pwd.showPasswords.accesskey");
 
     this.pwdCol = document.getElementById("pwdPasswordCol");
 
@@ -1268,6 +1624,7 @@ var gPasswords = {
   },
 
   shutdown: function passwords_shutdown() {
+    gDataman.debugMsg("Shutting down passwords panel");
     if (this.showPasswords)
       this.togglePasswordVisible();
     this.tree.view.selection.clearSelection();
@@ -1286,7 +1643,7 @@ var gPasswords = {
   },
 
   select: function passwords_select() {
-    var selections = gDatamanUtils.getTreeSelections(this.tree);
+    var selections = gDataman.getTreeSelections(this.tree);
     this.removeButton.disabled = !selections.length;
     return true;
   },
@@ -1346,7 +1703,7 @@ var gPasswords = {
     };
 
     if (aUpdateSelection) {
-      var selectionCache = gDatamanUtils.getSelectedIDs(this.tree, this._getObjID);
+      var selectionCache = gDataman.getSelectedIDs(this.tree, this._getObjID);
     }
     this.tree.view.selection.clearSelection();
 
@@ -1355,7 +1712,7 @@ var gPasswords = {
     this.tree.treeBoxObject.invalidate();
 
     if (aUpdateSelection) {
-      gDatamanUtils.restoreSelectionFromIDs(this.tree, this._getObjID,
+      gDataman.restoreSelectionFromIDs(this.tree, this._getObjID,
                                             selectionCache);
     }
 
@@ -1365,15 +1722,15 @@ var gPasswords = {
   },
 
   delete: function passwords_delete() {
-    var selections = gDatamanUtils.getTreeSelections(this.tree);
+    var selections = gDataman.getTreeSelections(this.tree);
 
     if (selections.length > 1) {
-      let title = gDatamanBundle.getString("pwd.deleteSelectedTitle");
-      let msg = gDatamanBundle.getString("pwd.deleteSelected");
+      let title = gDataman.bundle.getString("pwd.deleteSelectedTitle");
+      let msg = gDataman.bundle.getString("pwd.deleteSelected");
       let flags = ((Services.prompt.BUTTON_TITLE_IS_STRING * Services.prompt.BUTTON_POS_0) +
                    (Services.prompt.BUTTON_TITLE_CANCEL * Services.prompt.BUTTON_POS_1) +
                    Services.prompt.BUTTON_POS_1_DEFAULT)
-      let yes = gDatamanBundle.getString("pwd.deleteSelectedYes");
+      let yes = gDataman.bundle.getString("pwd.deleteSelectedYes");
       if (Services.prompt.confirmEx(window, title, msg, flags, yes, null, null,
                                     null, {value: 0}) == 1) // 1=="Cancel" button
         return;
@@ -1388,15 +1745,17 @@ var gPasswords = {
       this.tree.treeBoxObject.rowCountChanged(selections[i], -1);
       gLocSvc.pwd.removeLogin(delSignon);
     }
+    if (!this.displayedSignons.length)
+      gDomains.removeDomainOrFlag(gDomains.selectedDomain.title, "hasPasswords");
   },
 
   togglePasswordVisible: function passwords_togglePasswordVisible() {
     if (this.showPasswords || this._confirmShowPasswords()) {
       this.showPasswords = !this.showPasswords;
-      this.toggleButton.label = gDatamanBundle.getString(this.showPasswords ?
+      this.toggleButton.label = gDataman.bundle.getString(this.showPasswords ?
                                                          "pwd.hidePasswords" :
                                                          "pwd.showPasswords");
-      this.toggleButton.accessKey = gDatamanBundle.getString(this.showPasswords ?
+      this.toggleButton.accessKey = gDataman.bundle.getString(this.showPasswords ?
                                                              "pwd.hidePasswords.accesskey" :
                                                              "pwd.showPasswords.accesskey");
       this.pwdCol.hidden = !this.showPasswords;
@@ -1433,7 +1792,7 @@ var gPasswords = {
     // Confirm the user wants to display passwords
     return Services.prompt.confirmEx(window,
                                      null,
-                                     gDatamanBundle.getString("pwd.noMasterPasswordPrompt"),
+                                     gDataman.bundle.getString("pwd.noMasterPasswordPrompt"),
                                      Services.prompt.STD_YES_NO_BUTTONS,
                                      null, null, null, null, { value: false }) == 0; // 0=="Yes" button
   },
@@ -1454,9 +1813,9 @@ var gPasswords = {
     gLocSvc.clipboard.copyString(password);
   },
 
-  reactToChange: function passwords_reactToChange(aSubject, aState) {
-    // aState: addLogin, modifyLogin, removeLogin, removeAllLogins
-    if (aState == "removeAllLogins") {
+  reactToChange: function passwords_reactToChange(aSubject, aData) {
+    // aData: addLogin, modifyLogin, removeLogin, removeAllLogins
+    if (aData == "removeAllLogins") {
       // Go for re-parsing the whole thing
       if (this.displayedSignons.length) {
         this.tree.view.selection.clearSelection();
@@ -1478,7 +1837,7 @@ var gPasswords = {
 
     // Usual notifications for addLogin, modifyLogin, removeLogin - do "surgical" updates.
     let curLogin = null, oldLogin = null;
-    if (aState == "modifyLogin" &&
+    if (aData == "modifyLogin" &&
         aSubject instanceof Components.interfaces.nsIArray) {
       let enumerator = aSubject.enumerate();
       if (enumerator.hasMoreElements()) {
@@ -1494,14 +1853,14 @@ var gPasswords = {
       curLogin = aSubject; oldLogin = aSubject;
     }
     else {
-      Components.utils.reportError("Observed an unrecognized signon change of type " + aState);
+      Components.utils.reportError("Observed an unrecognized signon change of type " + aData);
     }
 
     let domain = gDomains.getDomainFromHost(curLogin.hostname);
     // Does change affect possibly loaded Passwords pane?
     let affectsLoaded = this.displayedSignons.length &&
                         gDomains.hostMatchesSelected(curLogin.hostname);
-    if (aState == "addLogin") {
+    if (aData == "addLogin") {
       this.allSignons.push(curLogin);
 
       if (affectsLoaded) {
@@ -1514,7 +1873,7 @@ var gPasswords = {
       }
     }
     else {
-      idx = -1; disp_idx = -1; domainPasswords = 0;
+      let idx = -1; disp_idx = -1; domainPasswords = 0;
       if (affectsLoaded) {
         for (let i = 0; i < this.displayedSignons.length; i++) {
           let signon = this.allSignons[this.displayedSignons[i]];
@@ -1523,7 +1882,7 @@ var gPasswords = {
             break;
           }
         }
-        if (aState == "removeLogin")
+        if (aData == "removeLogin")
           domainPasswords = this.displayedSignons.length;
       }
       else {
@@ -1531,27 +1890,27 @@ var gPasswords = {
           let signon = this.allSignons[i];
           if (signon && signon.equals(oldLogin)) {
             idx = i;
-            if (aState != "removeLogin")
+            if (aData != "removeLogin")
               break;
           }
-          if (aState == "removeLogin" &&
-              gDomains.getDomainFromHost(oldLogin.hostname) == domain)
+          if (aData == "removeLogin" &&
+              gDomains.getDomainFromHost(signon.hostname) == domain)
             domainPasswords++;
         }
       }
       if (idx >= 0) {
-        if (aState == "modifyLogin") {
+        if (aData == "modifyLogin") {
           this.allSignons[idx] = curLogin;
           if (affectsLoaded)
             this.tree.treeBoxObject.invalidateRow(disp_idx);
         }
-        else if (aState == "removeLogin") {
+        else if (aData == "removeLogin") {
           this.allSignons[idx] = null;
           if (affectsLoaded) {
             this.displayedSignons.splice(disp_idx, 1);
             this.tree.treeBoxObject.rowCountChanged(disp_idx, -1);
           }
-          if (domainCookies == 1)
+          if (domainPasswords == 1)
             gDomains.removeDomainOrFlag(domain, "hasPasswords");
         }
       }
@@ -1566,19 +1925,16 @@ var gPasswords = {
         this.allSignons[i] = null;
       }
     }
+    gDomains.removeDomainOrFlag(gDomains.selectedDomain.title, "hasPasswords");
   },
-};
 
-var passwordTreeView = {
+  // nsITreeView
+  __proto__: gBaseTreeView,
   get rowCount() {
-    return gPasswords.displayedSignons.length;
+    return this.displayedSignons.length;
   },
-  setTree: function(aTree) {},
-  getImageSrc: function(aRow, aColumn) {},
-  getProgressMode: function(aRow, aColumn) {},
-  getCellValue: function(aRow, aColumn) {},
   getCellText: function(aRow, aColumn) {
-    let signon = gPasswords.allSignons[gPasswords.displayedSignons[aRow]];
+    let signon = this.allSignons[this.displayedSignons[aRow]];
     switch (aColumn.id) {
       case "pwdHostCol":
         return signon.httpRealm ?
@@ -1590,331 +1946,9 @@ var passwordTreeView = {
         return signon.password || "";
     }
   },
-  isSeparator: function(aIndex) { return false; },
-  isSorted: function() { return false; },
-  isContainer: function(aIndex) { return false; },
-  cycleHeader: function(aCol) {},
-  getRowProperties: function(aRow, aProp) {},
-  getColumnProperties: function(aColumn, aProp) {},
-  getCellProperties: function(aRow, aColumn, aProp) {}
 };
 
-
-var gPrefs = {
-  tree: null,
-  removeButton: null,
-
-  prefs: [],
-  displayedPrefs: [],
-
-  initialize: function prefs_initialize() {
-    this.tree = document.getElementById("prefsTree");
-    this.tree.view = prefsTreeView;
-
-    this.removeButton = document.getElementById("prefsRemove");
-
-    this.tree.treeBoxObject.beginUpdateBatch();
-    // get all groups (hosts) that match the domain
-    let domain = gDomains.selectedDomain.title;
-    if (domain == "*") {
-      let enumerator = gLocSvc.cpref.getPrefs(null).enumerator;
-      while (enumerator.hasMoreElements()) {
-        let pref = enumerator.getNext().QueryInterface(Components.interfaces.nsIProperty);
-        this.prefs.push({host: null, name: pref.name, value: pref.value});
-        this.displayedPrefs.push(this.prefs.length - 1);
-      }
-    }
-    else {
-      try {
-        let sql = "SELECT groups.name AS host FROM groups WHERE host=:hostName OR host LIKE :hostMatch ESCAPE '/'";
-        var statement = gLocSvc.cpref.DBConnection.createStatement(sql);
-        statement.params.hostName = domain;
-        statement.params.hostMatch = "%." + statement.escapeStringForLIKE(domain, "/");
-        while (statement.executeStep()) {
-          // now, get all prefs for that host
-          let enumerator =  gLocSvc.cpref.getPrefs(statement.row["host"]).enumerator;
-          while (enumerator.hasMoreElements()) {
-            let pref = enumerator.getNext().QueryInterface(Components.interfaces.nsIProperty);
-            this.prefs.push({host: statement.row["host"], name: pref.name, value: pref.value});
-            this.displayedPrefs.push(this.prefs.length - 1);
-          }
-        }
-      }
-      finally {
-        statement.reset();
-      }
-    }
-    this.sort(null, false, false);
-    this.tree.treeBoxObject.endUpdateBatch();
-    this.tree.treeBoxObject.invalidate();
-  },
-
-  shutdown: function prefs_shutdown() {
-    this.tree.view.selection.clearSelection();
-    this.tree.view = null;
-    this.prefs = [];
-    this.displayedPrefs = [];
-  },
-
-  _getObjID: function prefs__getObjID(aIdx) {
-    var curPref = gPrefs.prefs[gPrefs.displayedPrefs[aIdx]];
-    return curPref.host + "|" + curPref.name;
-  },
-
-  select: function prefs_select() {
-    var selections = gDatamanUtils.getTreeSelections(this.tree);
-    this.removeButton.disabled = !selections.length;
-    return true;
-  },
-
-  selectAll: function prefs_selectAll() {
-    this.tree.view.selection.selectAll();
-  },
-
-  handleKeyPress: function prefs_handleKeyPress(aEvent) {
-    if (aEvent.keyCode == KeyEvent.DOM_VK_DELETE) {
-      this.delete();
-    }
-  },
-
-  sort: function prefs_sort(aColumn, aUpdateSelection, aInvertDirection) {
-    // make sure we have a valid column
-    let column = aColumn;
-    if (!column) {
-      let sortedCol = this.tree.columns.getSortedColumn();
-      if (sortedCol)
-        column = sortedCol.element;
-      else
-        column = document.getElementById("prefsHostCol");
-    }
-    else if (column.localName == "treecols" || column.localName == "splitter")
-      return;
-
-    if (!column || column.localName != "treecol") {
-      Components.utils.reportError("No column found to sort form data by");
-      return;
-    }
-
-    let dirAscending = column.getAttribute("sortDirection") !=
-                       (aInvertDirection ? "ascending" : "descending");
-    let dirFactor = dirAscending ? 1 : -1;
-
-    // Clear attributes on all columns, we're setting them again after sorting
-    for (let node = column.parentNode.firstChild; node; node = node.nextSibling) {
-      node.removeAttribute("sortActive");
-      node.removeAttribute("sortDirection");
-    }
-
-    // Compare function for two signons
-    let compfunc = function passwords_sort_compare(aOne, aTwo) {
-      switch (column.id) {
-        case "prefsHostCol":
-          return dirFactor * gPrefs.prefs[aOne].host
-                             .localeCompare(gPrefs.prefs[aTwo].host);
-        case "prefsNameCol":
-          return dirFactor * gPrefs.prefs[aOne].name
-                             .localeCompare(gPrefs.prefs[aTwo].name);
-        case "prefsValueCol":
-          return dirFactor * gPrefs.prefs[aOne].value
-                             .localeCompare(gPrefs.prefs[aTwo].value);
-      }
-      return 0;
-    };
-
-    if (aUpdateSelection) {
-      var selectionCache = gDatamanUtils.getSelectedIDs(this.tree, this._getObjID);
-    }
-    this.tree.view.selection.clearSelection();
-
-    // Do the actual sorting of the array
-    this.displayedPrefs.sort(compfunc);
-    this.tree.treeBoxObject.invalidate();
-
-    if (aUpdateSelection) {
-      gDatamanUtils.restoreSelectionFromIDs(this.tree, this._getObjID,
-                                            selectionCache);
-    }
-
-    // Set attributes to the sorting we did
-    column.setAttribute("sortActive", "true");
-    column.setAttribute("sortDirection", dirAscending ? "ascending" : "descending");
-  },
-
-  delete: function prefs_delete() {
-    var selections = gDatamanUtils.getTreeSelections(this.tree);
-
-    if (selections.length > 1) {
-      let title = gDatamanBundle.getString("prefs.deleteSelectedTitle");
-      let msg = gDatamanBundle.getString("prefs.deleteSelected");
-      let flags = ((Services.prompt.BUTTON_TITLE_IS_STRING * Services.prompt.BUTTON_POS_0) +
-                   (Services.prompt.BUTTON_TITLE_CANCEL * Services.prompt.BUTTON_POS_1) +
-                   Services.prompt.BUTTON_POS_1_DEFAULT)
-      let yes = gDatamanBundle.getString("prefs.deleteSelectedYes");
-      if (Services.prompt.confirmEx(window, title, msg, flags, yes, null, null,
-                                    null, {value: 0}) == 1) // 1=="Cancel" button
-        return;
-    }
-
-    this.tree.view.selection.clearSelection();
-    // Loop backwards so later indexes in the list don't change.
-    for (let i = selections.length - 1; i >= 0; i--) {
-      let delPref = this.prefs[this.displayedPrefs[selections[i]]];
-      this.prefs[this.displayedPrefs[selections[i]]] = null;
-      this.displayedPrefs.splice(selections[i], 1);
-      this.tree.treeBoxObject.rowCountChanged(selections[i], -1);
-      gLocSvc.cpref.removePref(delPref.host, delPref.name);
-    }
-  },
-
-  updateContext: function prefs_updateContext() {
-    document.getElementById("prefs-context-remove").disabled =
-      this.removeButton.disabled;
-    document.getElementById("prefs-context-selectall").disabled =
-      (this.tree.view.selection.count >= this.tree.view.rowCount);
-  },
-
-  reactToChange: function prefs_reactToChange(aSubject, aState) {
-    // aState: prefSet, prefRemoved
-
-    // Do "surgical" updates.
-    let domain = gDomains.getDomainFromHost(aSubject.host);
-    // Does change affect possibly loaded Preferences pane?
-    let affectsLoaded = this.displayedPrefs.length &&
-                        gDomains.hostMatchesSelected(aSubject.host);
-    idx = -1; disp_idx = -1; domainPrefs = 0;
-    if (affectsLoaded) {
-      for (let i = 0; i < this.displayedPrefs.length; i++) {
-        let cpref = this.prefs[this.displayedPrefs[i]];
-        if (cpref && cpref.host == aSubject.host && cpref.name == aSubject.name) {
-          idx = this.displayedPrefs[i]; disp_idx = i;
-          break;
-        }
-      }
-      if (aState == "prefRemoved")
-        domainPrefs = this.displayedPrefs.length;
-    }
-    else if (aState == "prefRemoved") {
-      // See if there are any prefs left for that domain.
-      if (domain == "*") {
-        let enumerator = gLocSvc.cpref.getPrefs(null).enumerator;
-        if (enumerator.hasMoreElements())
-          domainPrefs++;
-      }
-      else {
-        try {
-          let sql = "SELECT groups.name AS host FROM groups WHERE host=:hostName OR host LIKE :hostMatch ESCAPE '/'";
-          var statement = gLocSvc.cpref.DBConnection.createStatement(sql);
-          statement.params.hostName = domain;
-          statement.params.hostMatch = "%." + statement.escapeStringForLIKE(domain, "/");
-          while (statement.executeStep()) {
-            // now, get all prefs for that host
-            let enumerator = gLocSvc.cpref.getPrefs(statement.row["host"]).enumerator;
-            if (enumerator.hasMoreElements())
-              domainPrefs++;
-          }
-        }
-        finally {
-          statement.reset();
-        }
-      }
-      if (!domainPrefs)
-        gDomains.removeDomainOrFlag(domain, "hasPreferences");
-    }
-    if (idx >= 0) {
-      if (aState == "prefSet") {
-        this.prefs[idx] = aSubject;
-        if (affectsLoaded)
-          this.tree.treeBoxObject.invalidateRow(disp_idx);
-      }
-      else if (aState == "prefRemoved") {
-        this.prefs[idx] = null;
-        if (affectsLoaded) {
-          this.displayedPrefs.splice(disp_idx, 1);
-          this.tree.treeBoxObject.rowCountChanged(disp_idx, -1);
-        }
-        if (domainPrefs == 1)
-          gDomains.removeDomainOrFlag(domain, "hasPreferences");
-      }
-    }
-    else if (aState == "prefSet") {
-      // Pref set, no prev index known - either new or existing pref domain.
-      if (affectsLoaded) {
-        this.prefs.push(aSubject);
-        this.displayedPrefs.push(this.prefs.length - 1);
-        this.tree.treeBoxObject.rowCountChanged(this.prefs.length - 1, 1);
-        this.sort(null, true, false);
-      }
-      else {
-        gDomains.addDomainOrFlag(aSubject.host, "hasPreferences");
-      }
-    }
-  },
-
-  forget: function prefs_forget() {
-    let delPrefs = [];
-    try {
-      // get all groups (hosts) that match the domain
-      let domain = gDomains.selectedDomain.title;
-      if (domain == "*") {
-        let enumerator =  gLocSvc.cpref.getPrefs(null).enumerator;
-        while (enumerator.hasMoreElements()) {
-          let pref = enumerator.getNext().QueryInterface(Components.interfaces.nsIProperty);
-          delPrefs.push({host: null, name: pref.name, value: pref.value});
-        }
-      }
-      else {
-        let sql = "SELECT groups.name AS host FROM groups WHERE host=:hostName OR host LIKE :hostMatch ESCAPE '/'";
-        var statement = gLocSvc.cpref.DBConnection.createStatement(sql);
-        statement.params.hostName = domain;
-        statement.params.hostMatch = "%." + statement.escapeStringForLIKE(domain, "/");
-        while (statement.executeStep()) {
-          // now, get all prefs for that host
-          let enumerator =  gLocSvc.cpref.getPrefs(statement.row["host"]).enumerator;
-          while (enumerator.hasMoreElements()) {
-            let pref = enumerator.getNext().QueryInterface(Components.interfaces.nsIProperty);
-            delPrefs.push({host: statement.row["host"], name: pref.name, value: pref.value});
-          }
-        }
-      }
-    }
-    finally {
-      statement.reset();
-    }
-    for (let i = 0; i < delPrefs.length; i++) {
-      gLocSvc.cpref.removePref(delPrefs[i].host, delPrefs[i].name);
-    }
-  },
-};
-
-var prefsTreeView = {
-  get rowCount() {
-    return gPrefs.displayedPrefs.length;
-  },
-  setTree: function(aTree) {},
-  getImageSrc: function(aRow, aColumn) {},
-  getProgressMode: function(aRow, aColumn) {},
-  getCellValue: function(aRow, aColumn) {},
-  getCellText: function(aRow, aColumn) {
-    let cpref = gPrefs.prefs[gPrefs.displayedPrefs[aRow]];
-    switch (aColumn.id) {
-      case "prefsHostCol":
-        return cpref.host || "*";
-      case "prefsNameCol":
-        return cpref.name;
-      case "prefsValueCol":
-        return cpref.value;
-    }
-  },
-  isSeparator: function(aIndex) { return false; },
-  isSorted: function() { return false; },
-  isContainer: function(aIndex) { return false; },
-  cycleHeader: function(aCol) {},
-  getRowProperties: function(aRow, aProp) {},
-  getColumnProperties: function(aColumn, aProp) {},
-  getCellProperties: function(aRow, aColumn, aProp) {}
-};
-
-
+// :::::::::::::::::::: form data panel ::::::::::::::::::::
 var gFormdata = {
   tree: null,
   removeButton: null,
@@ -1924,8 +1958,9 @@ var gFormdata = {
   displayedFormdata: [],
 
   initialize: function formdata_initialize() {
+    gDataman.debugMsg("Initializing form data panel");
     this.tree = document.getElementById("formdataTree");
-    this.tree.view = formdataTreeView;
+    this.tree.view = this;
 
     this.searchfield = document.getElementById("fdataSearch");
     this.removeButton = document.getElementById("fdataRemove");
@@ -1936,6 +1971,7 @@ var gFormdata = {
   },
 
   shutdown: function formdata_shutdown() {
+    gDataman.debugMsg("Shutting down form data panel");
     this.tree.view.selection.clearSelection();
     this.tree.view = null;
     this.displayedFormdata = [];
@@ -1990,7 +2026,7 @@ var gFormdata = {
   },
 
   select: function formdata_select() {
-    var selections = gDatamanUtils.getTreeSelections(this.tree);
+    var selections = gDataman.getTreeSelections(this.tree);
     this.removeButton.disabled = !selections.length;
     return true;
   },
@@ -2056,7 +2092,7 @@ var gFormdata = {
     };
 
     if (aUpdateSelection) {
-      var selectionCache = gDatamanUtils.getSelectedIDs(this.tree, this._getObjID);
+      var selectionCache = gDataman.getSelectedIDs(this.tree, this._getObjID);
     }
     this.tree.view.selection.clearSelection();
 
@@ -2065,7 +2101,7 @@ var gFormdata = {
     this.tree.treeBoxObject.invalidate();
 
     if (aUpdateSelection) {
-      gDatamanUtils.restoreSelectionFromIDs(this.tree, this._getObjID,
+      gDataman.restoreSelectionFromIDs(this.tree, this._getObjID,
                                             selectionCache);
     }
 
@@ -2075,15 +2111,15 @@ var gFormdata = {
   },
 
   delete: function formdata_delete() {
-    var selections = gDatamanUtils.getTreeSelections(this.tree);
+    var selections = gDataman.getTreeSelections(this.tree);
 
     if (selections.length > 1) {
-      let title = gDatamanBundle.getString("fdata.deleteSelectedTitle");
-      let msg = gDatamanBundle.getString("fdata.deleteSelected");
+      let title = gDataman.bundle.getString("fdata.deleteSelectedTitle");
+      let msg = gDataman.bundle.getString("fdata.deleteSelected");
       let flags = ((Services.prompt.BUTTON_TITLE_IS_STRING * Services.prompt.BUTTON_POS_0) +
                    (Services.prompt.BUTTON_TITLE_CANCEL * Services.prompt.BUTTON_POS_1) +
                    Services.prompt.BUTTON_POS_1_DEFAULT)
-      let yes = gDatamanBundle.getString("fdata.deleteSelectedYes");
+      let yes = gDataman.bundle.getString("fdata.deleteSelectedYes");
       if (Services.prompt.confirmEx(window, title, msg, flags, yes, null, null,
                                     null, {value: 0}) == 1) // 1=="Cancel" button
         return;
@@ -2101,19 +2137,20 @@ var gFormdata = {
   },
 
   search: function formdata_search(aSearchString) {
-    var selectionCache = gDatamanUtils.getSelectedIDs(this.tree, this._getObjID);
+    var selectionCache = gDataman.getSelectedIDs(this.tree, this._getObjID);
     this.tree.view.selection.clearSelection();
     this.tree.treeBoxObject.beginUpdateBatch();
     this.displayedFormdata = [];
+    var lcSearch = aSearchString.toLocaleLowerCase();
     for (let i = 0; i < this.formdata.length; i++) {
       if (this.formdata[i] &&
-          (this.formdata[i].fieldname.toLocaleLowerCase().indexOf(aSearchString) != -1 ||
-           this.formdata[i].value.toLocaleLowerCase().indexOf(aSearchString) != -1))
+          (this.formdata[i].fieldname.toLocaleLowerCase().indexOf(lcSearch) != -1 ||
+           this.formdata[i].value.toLocaleLowerCase().indexOf(lcSearch) != -1))
         this.displayedFormdata.push(i);
     }
-    this.tree.treeBoxObject.endUpdateBatch();
     this.sort(null, false, false);
-    gDatamanUtils.restoreSelectionFromIDs(this.tree, this._getObjID,
+    this.tree.treeBoxObject.endUpdateBatch();
+    gDataman.restoreSelectionFromIDs(this.tree, this._getObjID,
                                           selectionCache);
   },
 
@@ -2128,19 +2165,19 @@ var gFormdata = {
       (this.tree.view.selection.count >= this.tree.view.rowCount);
   },
 
-  reactToChange: function formdata_reactToChange(aSubject, aState) {
-    // aState: addEntry, modifyEntry, removeEntry, removeAllEntries,
+  reactToChange: function formdata_reactToChange(aSubject, aData) {
+    // aData: addEntry, modifyEntry, removeEntry, removeAllEntries,
     // removeEntriesForName, removeEntriesByTimeframe, expireOldEntries,
     // before-removeEntry, before-removeAllEntries, before-removeEntriesForName,
     // before-removeEntriesByTimeframe, before-expireOldEntries
 
     // Ignore changes when no form data pane is loaded
     // or if we caught a before-* notification.
-    if (!this.displayedFormdata.length || /^before-/.test(aState))
+    if (!this.displayedFormdata.length || /^before-/.test(aData))
       return;
 
-    if (aState == "removeAllEntries" || aState == "removeEntriesForName" ||
-        aState == "removeEntriesByTimeframe" || aState == "expireOldEntries") {
+    if (aData == "removeAllEntries" || aData == "removeEntriesForName" ||
+        aData == "removeEntriesByTimeframe" || aData == "expireOldEntries") {
       // Go for re-parsing the whole thing
       this.tree.view.selection.clearSelection();
       this.tree.treeBoxObject.beginUpdateBatch();
@@ -2166,14 +2203,14 @@ var gFormdata = {
       }
     }
     else {
-      Components.utils.reportError("Observed an unrecognized formdata change of type " + aState);
+      Components.utils.reportError("Observed an unrecognized formdata change of type " + aData);
       return;
     }
 
     let entryData = null;
-    if (aState == "addEntry" || aState == "modifyEntry") {
+    if (aData == "addEntry" || aData == "modifyEntry") {
       try {
-        let sql = "SELECT fieldname, value, timesUsed, firstUsed, lastUsed, guid FROM moz_formhistory WHERE guid=:guid";
+        let sql = "SELECT fieldname, value, timesUsed, firstUsed, lastUsed, guid FROM moz_formhistory WHERE guid = :guid";
         var statement = gLocSvc.fhist.DBConnection.createStatement(sql);
         statement.params.guid = subjectData[2];
         while (statement.executeStep()) {
@@ -2197,7 +2234,7 @@ var gFormdata = {
       }
     }
 
-    if (aState == "addEntry") {
+    if (aData == "addEntry") {
       this.formdata.push(entryData);
 
       this.displayedFormdata.push(this.formdata.length - 1);
@@ -2205,7 +2242,7 @@ var gFormdata = {
       this.search("");
     }
     else {
-      idx = -1; disp_idx = -1;
+      let idx = -1; disp_idx = -1;
       for (let i = 0; i < this.displayedFormdata.length; i++) {
         let fdata = this.formdata[this.displayedFormdata[i]];
         if (fdata && fdata.guid == subjectData[2]) {
@@ -2214,11 +2251,11 @@ var gFormdata = {
         }
       }
       if (idx >= 0) {
-        if (aState == "modifyEntry") {
+        if (aData == "modifyEntry") {
           this.formdata[idx] = entryData;
           this.tree.treeBoxObject.invalidateRow(disp_idx);
         }
-        else if (aState == "removeEntry") {
+        else if (aData == "removeEntry") {
           this.formdata[idx] = null;
           this.displayedFormdata.splice(disp_idx, 1);
           this.tree.treeBoxObject.rowCountChanged(disp_idx, -1);
@@ -2230,39 +2267,30 @@ var gFormdata = {
   forget: function formdata_forget() {
     gLocSvc.fhist.removeAllEntries();
   },
-};
 
-var formdataTreeView = {
+  // nsITreeView
+  __proto__: gBaseTreeView,
   get rowCount() {
-    return gFormdata.displayedFormdata.length;
+    return this.displayedFormdata.length;
   },
-  setTree: function(aTree) {},
-  getImageSrc: function(aRow, aColumn) {},
-  getProgressMode: function(aRow, aColumn) {},
-  getCellValue: function(aRow, aColumn) {},
   getCellText: function(aRow, aColumn) {
+    let fdata = this.formdata[this.displayedFormdata[aRow]];
     switch (aColumn.id) {
       case "fdataFieldCol":
-        return gFormdata.formdata[gFormdata.displayedFormdata[aRow]].fieldname;
+        return fdata.fieldname;
       case "fdataValueCol":
-        return gFormdata.formdata[gFormdata.displayedFormdata[aRow]].value;
+        return fdata.value;
       case "fdataCountCol":
-        return gFormdata.formdata[gFormdata.displayedFormdata[aRow]].timesUsed;
+        return fdata.timesUsed;
       case "fdataFirstCol":
-        return gFormdata.formdata[gFormdata.displayedFormdata[aRow]].firstUsed;
+        return fdata.firstUsed;
       case "fdataLastCol":
-        return gFormdata.formdata[gFormdata.displayedFormdata[aRow]].lastUsed;
+        return fdata.lastUsed;
     }
   },
-  isSeparator: function(aIndex) { return false; },
-  isSorted: function() { return false; },
-  isContainer: function(aIndex) { return false; },
-  cycleHeader: function(aCol) {},
-  getRowProperties: function(aRow, aProp) {},
-  getColumnProperties: function(aColumn, aProp) {},
-  getCellProperties: function(aRow, aColumn, aProp) {}
 };
 
+// :::::::::::::::::::: forget panel ::::::::::::::::::::
 var gForget = {
   forgetDesc: null,
   forgetCookies: null,
@@ -2277,160 +2305,85 @@ var gForget = {
   forgetFormdataLabel: null,
   forgetButton: null,
 
-  initialize: function formdata_initialize() {
+  initialize: function forget_initialize() {
+    gDataman.debugMsg("Initializing forget panel");
+
     this.forgetDesc = document.getElementById("forgetDesc");
-    this.forgetCookies = document.getElementById("forgetCookies");
-    this.forgetPermissions = document.getElementById("forgetPermissions");
-    this.forgetPreferences = document.getElementById("forgetPreferences");
-    this.forgetPasswords = document.getElementById("forgetPasswords");
-    this.forgetFormdata = document.getElementById("forgetFormdata");
-    this.forgetCookiesLabel = document.getElementById("forgetCookiesLabel");
-    this.forgetPermissionsLabel = document.getElementById("forgetPermissionsLabel");
-    this.forgetPreferencesLabel = document.getElementById("forgetPreferencesLabel");
-    this.forgetPasswordsLabel = document.getElementById("forgetPasswordsLabel");
-    this.forgetFormdataLabel = document.getElementById("forgetFormdataLabel");
+    ["forgetCookies", "forgetPermissions", "forgetPreferences",
+     "forgetPasswords", "forgetFormdata"].forEach(function(elemID) {
+      gForget[elemID] = document.getElementById(elemID);
+      gForget[elemID].hidden = false;
+      gForget[elemID].checked = false;
+      let labelID = elemID + "Label";
+      gForget[labelID] = document.getElementById(labelID);
+      gForget[labelID].hidden = true;
+    });
     this.forgetButton = document.getElementById("forgetButton");
-
-    if (gDomains.selectedDomain.title == "*")
-      this.forgetDesc.value = gDatamanBundle.getString("forget.desc.global.pre");
-    else
-      this.forgetDesc.value = gDatamanBundle.getFormattedString("forget.desc.domain.pre",
-                                                                [gDomains.selectedDomain.title]);
-
-    this.forgetCookies.disabled = !selectedDomain.hasCookies;
-    this.forgetPermissions.disabled = !selectedDomain.hasPermissions;
-    this.forgetPreferences.disabled = !selectedDomain.hasPreferences;
-    this.forgetPasswords.disabled = !selectedDomain.hasPasswords;
-    this.forgetFormdata.disabled = !selectedDomain.hasFormData;
-    this.forgetFormdata.hidden = !selectedDomain.hasFormData;
-    this.forgetButton.disabled = !(selectedDomain.hasCookies ||
-                                   selectedDomain.hasPermissions ||
-                                   selectedDomain.hasPreferences ||
-                                   selectedDomain.hasPasswords ||
-                                   selectedDomain.hasFormData);
-  },
-
-  shutdown: function formdata_shutdown() {
-    this.forgetDesc.value = "";
-    this.forgetCookies.hidden = false;
-    this.forgetPermissions.hidden = false;
-    this.forgetPreferences.hidden = false;
-    this.forgetPasswords.hidden = false;
-    this.forgetFormdata.hidden = true;
-    this.forgetCookiesLabel.hidden = true;
-    this.forgetPermissionsLabel.hidden = true;
-    this.forgetPreferencesLabel.hidden = true;
-    this.forgetPasswordsLabel.hidden = true;
-    this.forgetFormdataLabel.hidden = true;
     this.forgetButton.hidden = false;
 
-    this.forgetCookies.checked = false;
-    this.forgetPermissions.checked = false;
-    this.forgetPreferences.checked = false;
-    this.forgetPasswords.checked = false;
-    this.forgetFormdata.checked = false;
-    this.forgetCookies.disabled = true;
-    this.forgetPermissions.disabled = true;
-    this.forgetPreferences.disabled = true;
-    this.forgetPasswords.disabled = true;
-    this.forgetFormdata.disabled = true;
-    this.forgetButton.disabled = true;
+    if (gDomains.selectedDomain.title == "*")
+      this.forgetDesc.value = gDataman.bundle.getString("forget.desc.global.pre");
+    else
+      this.forgetDesc.value = gDataman.bundle.getFormattedString("forget.desc.domain.pre",
+                                                                 [gDomains.selectedDomain.title]);
+
+    this.forgetCookies.disabled = !gDomains.selectedDomain.hasCookies;
+    this.forgetPermissions.disabled = !gDomains.selectedDomain.hasPermissions;
+    this.forgetPreferences.disabled = !gDomains.selectedDomain.hasPreferences;
+    this.forgetPasswords.disabled = !gDomains.selectedDomain.hasPasswords;
+    this.forgetFormdata.disabled = !gDomains.selectedDomain.hasFormData;
+    this.forgetFormdata.hidden = !gDomains.selectedDomain.hasFormData;
+    this.forgetButton.disabled = !(gDomains.selectedDomain.hasCookies ||
+                                   gDomains.selectedDomain.hasPermissions ||
+                                   gDomains.selectedDomain.hasPreferences ||
+                                   gDomains.selectedDomain.hasPasswords ||
+                                   gDomains.selectedDomain.hasFormData);
+  },
+
+  shutdown: function forget_shutdown() {
+    gDataman.debugMsg("Shutting down forget panel");
+    this.forgetDesc.value = "";
   },
 
   forget: function forget_forget() {
+    // Domain might get removed and selected domain changed!
+    let delDomainTitle = gDomains.selectedDomain.title;
+
     if (this.forgetCookies.checked) {
       gCookies.forget();
       this.forgetCookiesLabel.hidden = false;
     }
     this.forgetCookies.hidden = true;
+
     if (this.forgetPermissions.checked) {
       gPerms.forget();
       this.forgetPermissionsLabel.hidden = false;
     }
     this.forgetPermissions.hidden = true;
+
     if (this.forgetPreferences.checked) {
       gPrefs.forget();
       this.forgetPreferencesLabel.hidden = false;
     }
     this.forgetPreferences.hidden = true;
+
     if (this.forgetPasswords.checked) {
       gPasswords.forget();
       this.forgetPasswordsLabel.hidden = false;
     }
     this.forgetPasswords.hidden = true;
+
     if (this.forgetFormdata.checked) {
       gFormdata.forget();
       this.forgetFormdataLabel.hidden = false;
     }
     this.forgetFormdata.hidden = true;
 
-    if (gDomains.selectedDomain.title == "*")
-      this.forgetDesc.value = gDatamanBundle.getString("forget.desc.global.post");
+    if (delDomainTitle == "*")
+      this.forgetDesc.value = gDataman.bundle.getString("forget.desc.global.post");
     else
-      this.forgetDesc.value = gDatamanBundle.getFormattedString("forget.desc.domain.post",
-                                                                [gDomains.selectedDomain.title]);
+      this.forgetDesc.value = gDataman.bundle.getFormattedString("forget.desc.domain.post",
+                                                                 [delDomainTitle]);
     this.forgetButton.hidden = true;
   },
 };
-
-
-gDatamanUtils = {
-  getTreeSelections: function datamanUtils_getTreeSelections(aTree) {
-    let selections = [];
-    let select = aTree.view.selection;
-    if (select) {
-      let count = select.getRangeCount();
-      let min = new Object();
-      let max = new Object();
-      for (let i = 0; i < count; i++) {
-        select.getRangeAt(i, min, max);
-        for (var k=min.value; k<=max.value; k++) {
-          if (k != -1) {
-            selections[selections.length] = k;
-          }
-        }
-      }
-    }
-    return selections;
-  },
-
-  getSelectedIDs:
-  function datamanUtils_getSelectedIDs(aTree, aIDFunction) {
-    // get IDs of selected elements for later restoration
-    var selectionCache = [];
-    if (aTree.view.selection.count < 1)
-      return selectionCache;
-
-    // Walk all selected rows and cache their IDs
-    var start = {};
-    var end = {};
-    var numRanges = aTree.view.selection.getRangeCount();
-    for (let rg = 0; rg < numRanges; rg++){
-      aTree.view.selection.getRangeAt(rg, start, end);
-      for (let row = start.value; row <= end.value; row++){
-        selectionCache.push(aIDFunction(row));
-      }
-    }
-    return selectionCache;
-  },
-
-  restoreSelectionFromIDs:
-  function datamanUtils_getSelectedIDs(aTree, aIDFunction, aCachedIDs) {
-    // Restore selection from cached IDs (as possible)
-    if (!aCachedIDs.length)
-      return;
-
-    aTree.view.selection.clearSelection();
-    var dataLen = aTree.view.rowCount;
-    for each (let rowID in aCachedIDs) {
-      // Find out what row this is now and if possible, add it to the selection
-      let row = -1;
-      for (let idx = 0; idx < dataLen; idx++) {
-        if (aIDFunction(idx) == rowID)
-          row = idx;
-      }
-      if (row != -1)
-        aTree.view.selection.rangedSelect(row, row, true);
-    }
-  },
-}
