@@ -2342,7 +2342,6 @@ var gForget = {
 
   shutdown: function forget_shutdown() {
     gDataman.debugMsg("Shutting down forget panel");
-    this.forgetDesc.value = "";
   },
 
   forget: function forget_forget() {
