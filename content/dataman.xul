@@ -36,6 +36,7 @@
    -
    - ***** END LICENSE BLOCK ***** -->
 
+<?xml-stylesheet href="chrome://global/skin/" type="text/css"?>
 <?xml-stylesheet href="chrome://communicator/skin/" type="text/css"?>
 <?xml-stylesheet href="chrome://dataman/content/dataman.css" type="text/css"?>
 <?xml-stylesheet href="chrome://dataman/skin/dataman.css" type="text/css"?>
@@ -202,6 +203,7 @@
             </treecols>
             <treechildren/>
           </tree>
+
           <groupbox>
             <caption label="&cookies.infobox.label;"/>
             <grid flex="1">
@@ -209,24 +211,24 @@
                 <column/>
                 <column flex="1"/>
               </columns>
-              <rows>
 
+              <rows>
                 <row align="center">
-                  <hbox align="center" pack="end">
+                  <hbox pack="end">
                     <label value="&cookies.info.name.label;" control="cookieInfoName"/>
                   </hbox>
                   <textbox id="cookieInfoName" readonly="true" class="plain"/>
                 </row>
 
                 <row align="center">
-                  <hbox align="center" pack="end">
+                  <hbox pack="end">
                     <label value="&cookies.info.value.label;" control="cookieInfoValue"/>
                   </hbox>
                   <textbox id="cookieInfoValue" readonly="true" class="plain"/>
                 </row>
 
                 <row align="center">
-                  <hbox align="center" pack="end">
+                  <hbox pack="end">
                     <label id="cookieInfoHostLabel" value="&cookies.info.host.label;"
                            value_host="&cookies.info.host.label;"
                            value_domain="&cookies.info.domain.label;"
@@ -236,30 +238,30 @@
                 </row>
 
                 <row align="center">
-                  <hbox align="center" pack="end">
+                  <hbox pack="end">
                     <label value="&cookies.info.path.label;" control="cookieInfoPath"/>
                   </hbox>
                   <textbox id="cookieInfoPath" readonly="true" class="plain"/>
                 </row>
 
                 <row align="center">
-                  <hbox align="center" pack="end">
+                  <hbox pack="end">
                     <label value="&cookies.info.sendtype.label;" control="cookieInfoSendType"/>
                   </hbox>
                   <textbox id="cookieInfoSendType" readonly="true" class="plain"/>
                 </row>
 
                 <row align="center">
-                  <hbox align="center" pack="end">
+                  <hbox pack="end">
                     <label value="&cookies.info.expires.label;" control="cookieInfoExpires"/>
                   </hbox>
                   <textbox id="cookieInfoExpires" readonly="true" class="plain"/>
                 </row>
-
               </rows>
             </grid>
           </groupbox>
-          <hbox>
+
+          <hbox id="cookieButtons" align="center">
             <button id="cookieRemove" disabled="true"
                     label="&cookies.button.remove.label;"
                     accesskey="&cookies.button.remove.accesskey;"

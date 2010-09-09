@@ -95,7 +95,7 @@
 <!ENTITY perm.Block "Block">
 
 <!-- preferences -->
-<!ENTITY prefs.description "Content preferences are a way for &brandShortName; to make save of its settings, like zoom levels, specifically for a website.">
+<!ENTITY prefs.description "Content preferences are a way for &brandShortName; to save its settings, like zoom levels, specifically for a website.">
 
 <!ENTITY prefs.tree.host.label "Website">
 <!ENTITY prefs.tree.name.label "Preference Name">
@@ -144,8 +144,6 @@
 <!ENTITY fdata.button.remove.accesskey "R">
 
 <!-- forget -->
-<!ENTITY forget.description "This function has not been implemented in this version. In future versions, this tab will offer to forget/delete all data for the currently selected domain.">
-
 <!ENTITY forget.cookies.label "Cookies">
 <!ENTITY forget.cookies.accesskey "C">
 <!ENTITY forget.permissions.label "Permissions">

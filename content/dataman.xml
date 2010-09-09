@@ -91,6 +91,7 @@
 
       <method name="useDefault">
         <parameter name="aChecked"/>
+        <parameter name="aUIUpdateOnly"/>
         <body><![CDATA[
           let checkbox = document.getAnonymousElementByAttribute(this, "anonid", "useDefault");
           if (checkbox.checked != aChecked)
@@ -98,7 +99,8 @@
           let radioGroup = document.getAnonymousElementByAttribute(this, "anonid", "radioGroup");
           radioGroup.disabled = aChecked;
           if (aChecked) {
-            Services.perms.remove(this.host, this.type);
+            if (!aUIUpdateOnly)
+              Services.perms.remove(this.host, this.type);
             this.capability = gPerms.getDefault(this.type);
           }
           this._updateRadio();
@@ -107,12 +109,14 @@
 
       <method name="setCapability">
         <parameter name="aValue"/>
+        <parameter name="aUIUpdateOnly"/>
         <body><![CDATA[
           this.capability = aValue;
           let radio = document.getAnonymousElementByAttribute(this, "anonid", "permSetting-" + aValue);
           if (radio && !radio.selected)
             radio.radioGroup.selectedItem = radio;
-          Services.perms.add(Services.io.newURI("http://" + this.host, null, null), this.type, aValue);
+          if (!aUIUpdateOnly)
+            Services.perms.add(Services.io.newURI("http://" + this.host, null, null), this.type, aValue);
         ]]></body>
       </method>
 
@@ -211,12 +215,14 @@
 
       <method name="setCapability">
         <parameter name="aValue"/>
+        <parameter name="aUIUpdateOnly"/>
         <body><![CDATA[
           this.capability = aValue;
           let radio = document.getAnonymousElementByAttribute(this, "anonid", "permSetting-" + aValue);
           if (radio && !radio.selected)
             radio.radioGroup.selectedItem = radio;
-          gLocSvc.pwd.setLoginSavingEnabled(this.host, aValue == Services.perms.ALLOW_ACTION);
+          if (!aUIUpdateOnly)
+            gLocSvc.pwd.setLoginSavingEnabled(this.host, aValue == Services.perms.ALLOW_ACTION);
         ]]></body>
       </method>
     </implementation>

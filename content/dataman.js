@@ -154,13 +154,13 @@ var gDataman = {
     let select = aTree.view.selection;
     if (select) {
       let count = select.getRangeCount();
-      let min = new Object();
-      let max = new Object();
+      let min = {};
+      let max = {};
       for (let i = 0; i < count; i++) {
         select.getRangeAt(i, min, max);
-        for (var k = min.value; k <= max.value; k++)
+        for (let k = min.value; k <= max.value; k++)
           if (k != -1)
-            selections.push(k)
+            selections.push(k);
       }
     }
     return selections;
@@ -168,19 +168,18 @@ var gDataman = {
 
   getSelectedIDs: function dataman_getSelectedIDs(aTree, aIDFunction) {
     // Get IDs of selected elements for later restoration.
-    var selectionCache = [];
+    let selectionCache = [];
     if (aTree.view.selection.count < 1)
       return selectionCache;
 
     // Walk all selected rows and cache their IDs.
-    var start = {};
-    var end = {};
-    var numRanges = aTree.view.selection.getRangeCount();
+    let start = {};
+    let end = {};
+    let numRanges = aTree.view.selection.getRangeCount();
     for (let rg = 0; rg < numRanges; rg++){
       aTree.view.selection.getRangeAt(rg, start, end);
-      for (let row = start.value; row <= end.value; row++){
+      for (let row = start.value; row <= end.value; row++)
         selectionCache.push(aIDFunction(row));
-      }
     }
     return selectionCache;
   },
@@ -191,11 +190,10 @@ var gDataman = {
       return;
 
     aTree.view.selection.clearSelection();
-    // Find out wwhich current rows match a cached selection and add them to the selection.
-    for (let row = 0; row < aTree.view.rowCount; row++) {
+    // Find out which current rows match a cached selection and add them to the selection.
+    for (let row = 0; row < aTree.view.rowCount; row++)
       if (aCachedIDs.indexOf(aIDFunction(row)) != -1)
-        aTree.view.selection.rangedSelect(row, row, true);
-    }
+        aTree.view.selection.toggleSelect(row);
   },
 }
 
@@ -248,7 +246,7 @@ var gDomains = {
       loaderInstance.next();
     }
     function loader() {
-      // add domains for all cookies we find
+      // Add domains for all cookies we find.
       gDataman.debugMsg("Add cookies to domain list: " + Date.now()/1000);
       gDomains.ignoreUpdate = true;
       gCookies.loadList();
@@ -258,7 +256,7 @@ var gDomains = {
       gDomains.search(gDomains.searchfield.value);
       yield setTimeout(nextStep, 0);
 
-      // add domains for permissions
+      // Add domains for permissions.
       gDataman.debugMsg("Add permissions to domain list: " + Date.now()/1000);
       gDomains.ignoreUpdate = true;
       let enumerator = Services.perms.enumerator;
@@ -270,7 +268,7 @@ var gDomains = {
       gDomains.search(gDomains.searchfield.value);
       yield setTimeout(nextStep, 0);
 
-      // add domains for password rejects to permissions
+      // Add domains for password rejects to permissions.
       gDataman.debugMsg("Add pwd reject permissions to domain list: " + Date.now()/1000);
       gDomains.ignoreUpdate = true;
       let rejectHosts = gLocSvc.pwd.getAllDisabledHosts();
@@ -280,7 +278,7 @@ var gDomains = {
       gDomains.search(gDomains.searchfield.value);
       yield setTimeout(nextStep, 0);
 
-      // add domains for content prefs
+      // Add domains for content prefs.
       gDataman.debugMsg("Add content prefs to domain list: " + Date.now()/1000);
       gDomains.ignoreUpdate = true;
       try {
@@ -295,7 +293,7 @@ var gDomains = {
       gDomains.search(gDomains.searchfield.value);
       yield setTimeout(nextStep, 0);
 
-      // add domains for passwords
+      // Add domains for passwords.
       gDataman.debugMsg("Add passwords to domain list: " + Date.now()/1000);
       gDomains.ignoreUpdate = true;
       gPasswords.loadList();
@@ -306,7 +304,7 @@ var gDomains = {
       gDomains.search(gDomains.searchfield.value);
       yield setTimeout(nextStep, 0);
 
-      // Send a notification that we finished
+      // Send a notification that we finished.
       gDataman.debugMsg("Domain list built: " + Date.now()/1000);
       Services.obs.notifyObservers(window, "dataman-loaded", null);
       yield;
@@ -321,11 +319,11 @@ var gDomains = {
   },
 
   _getObjID: function domain__getObjID(aIdx) {
-    return gDomains.domainObjects[gDomains.displayedDomains[aIdx]].title;
+    return gDomains.displayedDomains[aIdx].title;
   },
 
   getDomainFromHost: function domain_getDomainFromHost(aHostname) {
-    // find the base domain name for the given host name
+    // Find the base domain name for the given host name.
     if (!this.xlcache[aHostname]) {
       // aHostname is not always an actual host name, but potentially something
       // URI-like, e.g. gopher://example.com and newURI doesn't work there as we
@@ -361,7 +359,7 @@ var gDomains = {
   },
 
   addDomainOrFlag: function domain_addDomainOrFlag(aHostname, aFlag) {
-    // for existing domains, add flags, for others, add them to the object
+    // For existing domains, add flags, for others, add them to the object.
     let domain = this.getDomainFromHost(aHostname);
     if (!this.domainObjects[domain]) {
       this.domainObjects[domain] = {title: domain};
@@ -375,19 +373,17 @@ var gDomains = {
       gDataman.debugMsg("added flag " + aFlag + " to " + domain);
       if (domain == this.selectedDomain.title) {
         // Just update the tab states.
-        this.select({aNoTabSelect: true});
+        this.select(true);
       }
     }
   },
 
   removeDomainOrFlag: function domain_removeDomainOrFlag(aDomain, aFlag) {
-    // remove a flag from the given domain,
-    // remove the whole domain if it doesn't have any flags left
+    // Remove a flag from the given domain,
+    // remove the whole domain if it doesn't have any flags left.
     if (!this.domainObjects[aDomain])
       return;
 
-    var selectionCache = gDataman.getSelectedIDs(this.tree, this._getObjID);
-    this.tree.view.selection.clearSelection();
     gDataman.debugMsg("removed flag " + aFlag + " from " + aDomain);
     this.domainObjects[aDomain][aFlag] = false;
     if (!this.domainObjects[aDomain].hasCookies &&
@@ -396,18 +392,25 @@ var gDomains = {
         !this.domainObjects[aDomain].hasPasswords &&
         !this.domainObjects[aDomain].hasFormData) {
       gDataman.debugMsg("removed domain: " + aDomain);
-      this.domainObjects[aDomain] = null;
-      this.search(this.searchfield.value);
+      // Get index in display tree.
+      let disp_idx = -1;
+      for (let i = 0; i < this.displayedDomains.length; i++) {
+        if (this.displayedDomains[i] == this.domainObjects[aDomain]) {
+          disp_idx = i;
+          break;
+        }
+      }
+      this.displayedDomains.splice(disp_idx, 1);
+      this.tree.treeBoxObject.rowCountChanged(disp_idx, -1);
+      delete this.domainObjects[aDomain];
+      // Make sure we clear the data pane when selection has been removed.
+      if (!this.tree.view.selection.count)
+        this.select();
     }
     else {
       // Just update the tab states.
-      this.select({aNoTabSelect: true});
+      this.select(true);
     }
-    gDataman.restoreSelectionFromIDs(this.tree, this._getObjID,
-                                          selectionCache);
-    // make sure we clear the data pane when selection has been removed
-    if (!this.tree.view.selection.count && selectionCache.length)
-      this.select();
   },
 
   resetFlagToDomains: function domain_resetFlagToDomains(aFlag, aDomainList) {
@@ -420,8 +423,7 @@ var gDomains = {
     this.tree.view.selection.clearSelection();
     // First, clear all domains of this flag.
     for (let domain in this.domainObjects) {
-      if (this.domainObjects[domain])
-        this.domainObjects[domain][aFlag] = false;
+      this.domainObjects[domain][aFlag] = false;
     }
     // Then, set it again on all domains in the new list.
     for (let i = 0; i < aDomainList.length; i++) {
@@ -434,14 +436,13 @@ var gDomains = {
           !this.domainObjects[domain].hasPreferences &&
           !this.domainObjects[domain].hasPasswords &&
           !this.domainObjects[domain].hasFormData) {
-        this.domainObjects[domain] = null;
+        delete this.domainObjects[domain];
       }
     }
     this.search(this.searchfield.value);
     this.ignoreSelect = false;
-    gDataman.restoreSelectionFromIDs(this.tree, this._getObjID,
-                                          selectionCache);
-    // make sure we clear the data pane when selection has been removed
+    gDataman.restoreSelectionFromIDs(this.tree, this._getObjID, selectionCache);
+    // Make sure we clear the data pane when selection has been removed.
     if (!this.tree.view.selection.count && selectionCache.length)
       this.select();
   },
@@ -449,7 +450,7 @@ var gDomains = {
   select: function domain_select(aNoTabSelect) {
     if (this.ignoreSelect) {
       if (this.tree.view.selection.count == 1)
-        this.selectedDomain = this.domainObjects[this.displayedDomains[this.tree.currentIndex]];
+        this.selectedDomain = this.displayedDomains[this.tree.currentIndex];
       return;
     }
 
@@ -476,8 +477,8 @@ var gDomains = {
       this.selectedDomain = {title: null};
       return;
     }
-    this.selectedDomain = this.domainObjects[this.displayedDomains[this.tree.currentIndex]];
-    // disable/enable and hide/show the tabs as needed
+    this.selectedDomain = this.displayedDomains[this.tree.currentIndex];
+    // Disable/enable and hide/show the tabs as needed.
     gTabs.cookiesTab.disabled = !this.selectedDomain.hasCookies;
     gTabs.permissionsTab.disabled = !this.selectedDomain.hasPermissions;
     gTabs.preferencesTab.disabled = !this.selectedDomain.hasPreferences;
@@ -486,8 +487,8 @@ var gDomains = {
     gTabs.formdataTab.disabled = !this.selectedDomain.hasFormData;
     gTabs.forgetTab.disabled = true;
     gTabs.forgetTab.hidden = true;
-    // switch to the first non-disabled tab if the one that's showing is
-    // disabled, otherwise, you can't use the keyboard to switch tabs
+    // Switch to the first non-disabled tab if the one that's showing is
+    // disabled, otherwise, you can't use the keyboard to switch tabs.
     if (gTabs.tabbox.selectedTab.disabled) {
       for (let i = 0; i < gTabs.tabbox.tabs.childNodes.length; ++i) {
         if (!gTabs.tabbox.tabs.childNodes[i].disabled) {
@@ -512,13 +513,12 @@ var gDomains = {
   },
 
   sort: function domain_sort() {
-    // Compare function for two domain items
+    // compare function for two domain items
     let compfunc = function domain_sort_compare(aOne, aTwo) {
-      return gDomains.domainObjects[aOne].title
-                     .localeCompare(gDomains.domainObjects[aTwo].title);
+      return aOne.title.localeCompare(aTwo.title);
     };
 
-    // Do the actual sorting of the array
+    // Do the actual sorting of the array.
     this.displayedDomains.sort(compfunc);
     this.tree.treeBoxObject.invalidate();
   },
@@ -531,22 +531,20 @@ var gDomains = {
 
   search: function domain_search(aSearchString) {
     this.ignoreSelect = true;
+    this.tree.treeBoxObject.beginUpdateBatch();
     var selectionCache = gDataman.getSelectedIDs(this.tree, this._getObjID);
     this.tree.view.selection.clearSelection();
-    this.tree.treeBoxObject.beginUpdateBatch();
     this.displayedDomains = [];
     var lcSearch = aSearchString.toLocaleLowerCase();
     for (let domain in this.domainObjects) {
-      if (this.domainObjects[domain] &&
-          domain.toLocaleLowerCase().indexOf(lcSearch) != -1)
-        this.displayedDomains.push(domain);
+      if (domain.toLocaleLowerCase().indexOf(lcSearch) != -1)
+        this.displayedDomains.push(this.domainObjects[domain]);
     }
     this.sort();
+    gDataman.restoreSelectionFromIDs(this.tree, this._getObjID, selectionCache);
     this.tree.treeBoxObject.endUpdateBatch();
-    gDataman.restoreSelectionFromIDs(this.tree, this._getObjID,
-                                          selectionCache);
     this.ignoreSelect = false;
-    // make sure we clear the data pane when selection has been removed
+    // Make sure we clear the data pane when selection has been removed.
     if (!this.tree.view.selection.count && selectionCache.length)
       this.select();
   },
@@ -574,7 +572,7 @@ var gDomains = {
   getCellText: function(aRow, aColumn) {
     switch (aColumn.id) {
       case "domainCol":
-        return this.domainObjects[this.displayedDomains[aRow]].title;
+        return this.displayedDomains[aRow].title;
     }
   },
 };
@@ -686,17 +684,14 @@ var gCookies = {
     this.removeButton = document.getElementById("cookieRemove");
     this.blockOnRemove = document.getElementById("cookieBlockOnRemove");
 
-    if (!this.cookies.length)
-      this.loadList();
+    // this.loadList() is being called in gDomains.initialize() already
     this.tree.treeBoxObject.beginUpdateBatch();
-    for (let i = 0; i < this.cookies.length; i++) {
-      if (this.cookies[i] &&
-          gDomains.hostMatchesSelected(this.cookies[i].rawHost))
-        this.displayedCookies.push(i);
-    }
+    this.displayedCookies = this.cookies.filter(
+      function (aCookie) {
+        return gDomains.hostMatchesSelected(aCookie.rawHost);
+      });
     this.sort(null, false, false);
     this.tree.treeBoxObject.endUpdateBatch();
-    this.tree.treeBoxObject.invalidate();
   },
 
   shutdown: function cookies_shutdown() {
@@ -732,7 +727,7 @@ var gCookies = {
   },
 
   _getObjID: function cookies__getObjID(aIdx) {
-    var curCookie = gCookies.cookies[gCookies.displayedCookies[aIdx]];
+    var curCookie = gCookies.displayedCookies[aIdx];
     return curCookie.host + "|" + curCookie.path + "|" + curCookie.name;
   },
 
@@ -740,9 +735,9 @@ var gCookies = {
     if (aExpires) {
       let date = new Date(1000 * aExpires);
 
-      // if a server manages to set a really long-lived cookie, the dateservice
-      // can't cope with it properly, so we'll just return a blank string
-      // see bug 238045 for details
+      // If a server manages to set a really long-lived cookie, the dateservice
+      // can't cope with it properly, so we'll just return a blank string.
+      // See bug 238045 for details.
       let expiry = "";
       try {
         expiry = gLocSvc.date.FormatDateTime("", gLocSvc.date.dateFormatLong,
@@ -750,9 +745,7 @@ var gCookies = {
                                              date.getFullYear(), date.getMonth()+1,
                                              date.getDate(), date.getHours(),
                                              date.getMinutes(), date.getSeconds());
-      } catch(ex) {
-        // do nothing
-      }
+      } catch(ex) {}
       return expiry;
     }
     return gDataman.bundle.getString("cookies.expireAtEndOfSession");
@@ -772,7 +765,7 @@ var gCookies = {
     }
 
     // At this point, we have a single cookie selected.
-    var showCookie = this.cookies[this.displayedCookies[selections[0]]];
+    var showCookie = this.displayedCookies[selections[0]];
 
     this.cookieInfoName.value = showCookie.name;
     this.cookieInfoValue.value = showCookie.value;
@@ -809,7 +802,7 @@ var gCookies = {
   },
 
   sort: function cookies_sort(aColumn, aUpdateSelection, aInvertDirection) {
-    // make sure we have a valid column
+    // Make sure we have a valid column.
     let column = aColumn;
     if (!column) {
       let sortedCol = this.tree.columns.getSortedColumn();
@@ -830,24 +823,21 @@ var gCookies = {
                        (aInvertDirection ? "ascending" : "descending");
     let dirFactor = dirAscending ? 1 : -1;
 
-    // Clear attributes on all columns, we're setting them again after sorting
+    // Clear attributes on all columns, we're setting them again after sorting.
     for (let node = column.parentNode.firstChild; node; node = node.nextSibling) {
       node.removeAttribute("sortActive");
       node.removeAttribute("sortDirection");
     }
 
-    // Compare function for two formdata items
+    // compare function for two formdata items
     let compfunc = function formdata_sort_compare(aOne, aTwo) {
       switch (column.id) {
         case "cookieHostCol":
-          return dirFactor * gCookies.cookies[aOne].rawHost
-                             .localeCompare(gCookies.cookies[aTwo].rawHost);
+          return dirFactor * aOne.rawHost.localeCompare(aTwo.rawHost);
         case "cookieNameCol":
-          return dirFactor * gCookies.cookies[aOne].name
-                             .localeCompare(gCookies.cookies[aTwo].name);
+          return dirFactor * aOne.name.localeCompare(aTwo.name);
         case "cookieExpiresCol":
-          return dirFactor * (gCookies.cookies[aOne].expiresSortValue -
-                              gCookies.cookies[aTwo].expiresSortValue);
+          return dirFactor * (aOne.expiresSortValue - aTwo.expiresSortValue);
       }
       return 0;
     };
@@ -857,16 +847,15 @@ var gCookies = {
     }
     this.tree.view.selection.clearSelection();
 
-    // Do the actual sorting of the array
+    // Do the actual sorting of the array.
     this.displayedCookies.sort(compfunc);
     this.tree.treeBoxObject.invalidate();
 
     if (aUpdateSelection) {
-      gDataman.restoreSelectionFromIDs(this.tree, this._getObjID,
-                                            selectionCache);
+      gDataman.restoreSelectionFromIDs(this.tree, this._getObjID, selectionCache);
     }
 
-    // Set attributes to the sorting we did
+    // Set attributes to the sorting we did.
     column.setAttribute("sortActive", "true");
     column.setAttribute("sortDirection", dirAscending ? "ascending" : "descending");
   },
@@ -889,8 +878,8 @@ var gCookies = {
     this.tree.view.selection.clearSelection();
     // Loop backwards so later indexes in the list don't change.
     for (let i = selections.length - 1; i >= 0; i--) {
-      let delCookie = this.cookies[this.displayedCookies[selections[i]]];
-      this.cookies[this.displayedCookies[selections[i]]] = null;
+      let delCookie = this.displayedCookies[selections[i]];
+      this.cookies.splice(this.cookies.indexOf(this.displayedCookies[selections[i]]), 1);
       this.displayedCookies.splice(selections[i], 1);
       this.tree.treeBoxObject.rowCountChanged(selections[i], -1);
       gLocSvc.cookie.remove(delCookie.host, delCookie.name, delCookie.path,
@@ -904,7 +893,7 @@ var gCookies = {
     document.getElementById("cookies-context-remove").disabled =
       this.removeButton.disabled;
     document.getElementById("cookies-context-selectall").disabled =
-      (this.tree.view.selection.count >= this.tree.view.rowCount);
+      this.tree.view.selection.count >= this.tree.view.rowCount;
   },
 
   reactToChange: function cookies_reactToChange(aSubject, aData) {
@@ -912,7 +901,7 @@ var gCookies = {
     // see http://mxr.mozilla.org/mozilla-central/source/netwerk/cookie/nsICookieService.idl
     if (aData == "batch-deleted" || aData == "cleared" || aData == "reload") {
       // Go for re-parsing the whole thing, as cleared and reload need that anyhow
-      // (batch-deleted has an nsIArray of cookies, we could in theory do better there)
+      // (batch-deleted has an nsIArray of cookies, we could in theory do better there).
       var selectionCache = [];
       if (this.displayedCookies.length) {
         selectionCache = gDataman.getSelectedIDs(this.tree, this._getObjID);
@@ -926,20 +915,17 @@ var gCookies = {
           domainList.push(domain);
       }
       gDomains.resetFlagToDomains("hasCookies", domainList);
-      // Restore the local panel display if needed
+      // Restore the local panel display if needed.
       if (gTabs.activePanel == "cookiesPanel" &&
           gDomains.selectedDomain.hasCookies) {
         this.tree.treeBoxObject.beginUpdateBatch();
-        for (let i = 0; i < this.cookies.length; i++) {
-          if (this.cookies[i] &&
-              gDomains.hostMatchesSelected(this.cookies[i].rawHost))
-            this.displayedCookies.push(i);
-        }
+        this.displayedCookies = this.cookies.filter(
+          function (aCookie) {
+            return gDomains.hostMatchesSelected(aCookie.rawHost);
+          });
         this.sort(null, false, false);
+        gDataman.restoreSelectionFromIDs(this.tree, this._getObjID, selectionCache);
         this.tree.treeBoxObject.endUpdateBatch();
-        this.tree.treeBoxObject.invalidate();
-        gDataman.restoreSelectionFromIDs(this.tree, this._getObjID,
-                                              selectionCache);
       }
       return;
     }
@@ -953,7 +939,7 @@ var gCookies = {
     if (aData == "added") {
       this.cookies.push(this._makeCookieObject(aSubject));
       if (affectsLoaded) {
-        this.displayedCookies.push(this.cookies.length - 1);
+        this.displayedCookies.push(this.cookies[this.cookies.length - 1]);
         this.tree.treeBoxObject.rowCountChanged(this.cookies.length - 1, 1);
         this.sort(null, true, false);
       }
@@ -962,13 +948,14 @@ var gCookies = {
       }
     }
     else {
-      let idx = -1; disp_idx = -1; domainCookies = 0;
+      let idx = -1, disp_idx = -1, domainCookies = 0;
       if (affectsLoaded) {
         for (let i = 0; i < this.displayedCookies.length; i++) {
-          let cookie = this.cookies[this.displayedCookies[i]];
-          if (cookie && cookie.host == aSubject.host &&
-              cookie.name == aSubject.name && cookie.path == aSubject.path) {
-            idx = this.displayedCookies[i]; disp_idx = i;
+          let cookie = this.displayedCookies[i];
+          if (cookie.host == aSubject.host && cookie.name == aSubject.name &&
+              cookie.path == aSubject.path) {
+            idx = this.cookies.indexOf(this.displayedCookies[i]);
+            disp_idx = i;
             break;
           }
         }
@@ -978,8 +965,8 @@ var gCookies = {
       else {
         for (let i = 0; i < this.cookies.length; i++) {
           let cookie = this.cookies[i];
-          if (cookie && cookie.host == aSubject.host &&
-              cookie.name == aSubject.name && cookie.path == aSubject.path) {
+          if (cookie.host == aSubject.host && cookie.name == aSubject.name &&
+              cookie.path == aSubject.path) {
             idx = i;
             if (aData != "deleted")
               break;
@@ -996,7 +983,7 @@ var gCookies = {
             this.tree.treeBoxObject.invalidateRow(disp_idx);
         }
         else if (aData == "deleted") {
-          this.cookies[idx] = null;
+          this.cookies.splice(idx, 1);
           if (affectsLoaded) {
             this.displayedCookies.splice(disp_idx, 1);
             this.tree.treeBoxObject.rowCountChanged(disp_idx, -1);
@@ -1010,11 +997,10 @@ var gCookies = {
 
   forget: function cookies_forget() {
     for (let i = 0; i < this.cookies.length; i++) {
-      if (this.cookies[i] &&
-          gDomains.hostMatchesSelected(this.cookies[i].rawHost)) {
+      if (gDomains.hostMatchesSelected(this.cookies[i].rawHost)) {
         gLocSvc.cookie.remove(this.cookies[i].host, this.cookies[i].name,
                               this.cookies[i].path, false);
-        this.cookies[i] = null;
+        this.cookies.splice(i, 1);
       }
     }
     gDomains.removeDomainOrFlag(gDomains.selectedDomain.title, "hasCookies");
@@ -1026,7 +1012,7 @@ var gCookies = {
     return this.displayedCookies.length;
   },
   getCellText: function(aRow, aColumn) {
-    let cookie = this.cookies[this.displayedCookies[aRow]];
+    let cookie = this.displayedCookies[aRow];
     switch (aColumn.id) {
       case "cookieHostCol":
         return cookie.rawHost;
@@ -1061,7 +1047,7 @@ var gPerms = {
         this.list.appendChild(permElem);
       }
     }
-    // visually treat password rejects like permissions
+    // Visually treat password rejects like permissions.
     let rejectHosts = gLocSvc.pwd.getAllDisabledHosts();
     for (let i = 0; i < rejectHosts.length; i++) {
       if (gDomains.hostMatchesSelected(rejectHosts[i])) {
@@ -1088,6 +1074,8 @@ var gPerms = {
 
   getDefault: function permissions_getDefault(aType) {
     switch (aType) {
+      case "allowXULXBL":
+        return Services.perms.DENY_ACTION;
       case "cookie":
         if (Services.prefs.getIntPref("network.cookie.cookieBehavior") == 2)
           return Services.perms.DENY_ACTION;
@@ -1111,7 +1099,7 @@ var gPerms = {
           return Services.perms.DENY_ACTION;
         return Services.perms.ALLOW_ACTION;
     }
-    return false;
+    return Services.perms.UNKNOWN_ACTION;
   },
 
   reactToChange: function permissions_reactToChange(aSubject, aData) {
@@ -1133,8 +1121,7 @@ var gPerms = {
       }
       if (aData == "hostSavingEnabled") {
         if (affectsLoaded) {
-          if (permElem.capability != Services.perms.ALLOW_ACTION)
-            permElem.setCapability(Services.perms.ALLOW_ACTION);
+          permElem.setCapability(Services.perms.ALLOW_ACTION, true);
         }
         else {
           // Only remove if domain is not shown, note that this may leave an empty domain.
@@ -1158,8 +1145,7 @@ var gPerms = {
       else if (aData == "hostSavingDisabled") {
         if (affectsLoaded) {
           if (permElem) {
-            if (permElem.capability != Services.perms.DENY_ACTION)
-              permElem.setCapability(Services.perms.DENY_ACTION);
+            permElem.setCapability(Services.perms.DENY_ACTION, true);
           }
           else {
             permElem = document.createElement("richlistitem");
@@ -1207,7 +1193,7 @@ var gPerms = {
       }
       if (aData == "deleted") {
         if (affectsLoaded) {
-          permElem.useDefault(true);
+          permElem.useDefault(true, true);
         }
         else {
           // Only remove if domain is not shown, note that this may leave an empty domain.
@@ -1229,13 +1215,13 @@ var gPerms = {
         }
       }
       else if (aData == "changed" && affectsLoaded) {
-        permElem.setCapability(aSubject.capability);
+        permElem.setCapability(aSubject.capability, true);
       }
       else if (aData == "added") {
         if (affectsLoaded) {
           if (permElem) {
-            permElem.useDefault(false);
-            permElem.setCapability(aSubject.capability);
+            permElem.useDefault(false, true);
+            permElem.setCapability(aSubject.capability, true);
           }
           else {
             permElem = document.createElement("richlistitem");
@@ -1267,7 +1253,7 @@ var gPerms = {
     for (let i = 0; i < delPerms.length; i++) {
       Services.perms.remove(delPerms[i].host, delPerms[i].type);
     }
-    // also remove all password rejects
+    // Also remove all password rejects.
     let rejectHosts = gLocSvc.pwd.getAllDisabledHosts();
     for (let i = 0; i < rejectHosts.length; i++) {
       if (gDomains.hostMatchesSelected(rejectHosts[i])) {
@@ -1284,7 +1270,6 @@ var gPrefs = {
   removeButton: null,
 
   prefs: [],
-  displayedPrefs: [],
 
   initialize: function prefs_initialize() {
     gDataman.debugMsg("Initializing prefs panel");
@@ -1294,14 +1279,13 @@ var gPrefs = {
     this.removeButton = document.getElementById("prefsRemove");
 
     this.tree.treeBoxObject.beginUpdateBatch();
-    // get all groups (hosts) that match the domain
+    // Get all groups (hosts) that match the domain.
     let domain = gDomains.selectedDomain.title;
     if (domain == "*") {
       let enumerator = Services.contentPrefs.getPrefs(null).enumerator;
       while (enumerator.hasMoreElements()) {
         let pref = enumerator.getNext().QueryInterface(Components.interfaces.nsIProperty);
         this.prefs.push({host: null, name: pref.name, value: pref.value});
-        this.displayedPrefs.push(this.prefs.length - 1);
       }
     }
     else {
@@ -1311,12 +1295,11 @@ var gPrefs = {
         statement.params.hostName = domain;
         statement.params.hostMatch = "%." + statement.escapeStringForLIKE(domain, "/");
         while (statement.executeStep()) {
-          // now, get all prefs for that host
+          // Now, get all prefs for that host.
           let enumerator =  Services.contentPrefs.getPrefs(statement.row["host"]).enumerator;
           while (enumerator.hasMoreElements()) {
             let pref = enumerator.getNext().QueryInterface(Components.interfaces.nsIProperty);
             this.prefs.push({host: statement.row["host"], name: pref.name, value: pref.value});
-            this.displayedPrefs.push(this.prefs.length - 1);
           }
         }
       }
@@ -1326,7 +1309,6 @@ var gPrefs = {
     }
     this.sort(null, false, false);
     this.tree.treeBoxObject.endUpdateBatch();
-    this.tree.treeBoxObject.invalidate();
   },
 
   shutdown: function prefs_shutdown() {
@@ -1334,11 +1316,10 @@ var gPrefs = {
     this.tree.view.selection.clearSelection();
     this.tree.view = null;
     this.prefs = [];
-    this.displayedPrefs = [];
   },
 
   _getObjID: function prefs__getObjID(aIdx) {
-    var curPref = gPrefs.prefs[gPrefs.displayedPrefs[aIdx]];
+    var curPref = gPrefs.prefs[aIdx];
     return curPref.host + "|" + curPref.name;
   },
 
@@ -1359,7 +1340,7 @@ var gPrefs = {
   },
 
   sort: function prefs_sort(aColumn, aUpdateSelection, aInvertDirection) {
-    // make sure we have a valid column
+    // Make sure we have a valid column.
     let column = aColumn;
     if (!column) {
       let sortedCol = this.tree.columns.getSortedColumn();
@@ -1380,24 +1361,21 @@ var gPrefs = {
                        (aInvertDirection ? "ascending" : "descending");
     let dirFactor = dirAscending ? 1 : -1;
 
-    // Clear attributes on all columns, we're setting them again after sorting
+    // Clear attributes on all columns, we're setting them again after sorting.
     for (let node = column.parentNode.firstChild; node; node = node.nextSibling) {
       node.removeAttribute("sortActive");
       node.removeAttribute("sortDirection");
     }
 
-    // Compare function for two content prefs
+    // compare function for two content prefs
     let compfunc = function prefs_sort_compare(aOne, aTwo) {
       switch (column.id) {
         case "prefsHostCol":
-          return dirFactor * gPrefs.prefs[aOne].host
-                             .localeCompare(gPrefs.prefs[aTwo].host);
+          return dirFactor * aOne.host.localeCompare(aTwo.host);
         case "prefsNameCol":
-          return dirFactor * gPrefs.prefs[aOne].name
-                             .localeCompare(gPrefs.prefs[aTwo].name);
+          return dirFactor * aOne.name.localeCompare(aTwo.name);
         case "prefsValueCol":
-          return dirFactor * gPrefs.prefs[aOne].value
-                             .localeCompare(gPrefs.prefs[aTwo].value);
+          return dirFactor * aOne.value.toString().localeCompare(aTwo.value);
       }
       return 0;
     };
@@ -1407,16 +1385,15 @@ var gPrefs = {
     }
     this.tree.view.selection.clearSelection();
 
-    // Do the actual sorting of the array
-    this.displayedPrefs.sort(compfunc);
+    // Do the actual sorting of the array.
+    this.prefs.sort(compfunc);
     this.tree.treeBoxObject.invalidate();
 
     if (aUpdateSelection) {
-      gDataman.restoreSelectionFromIDs(this.tree, this._getObjID,
-                                            selectionCache);
+      gDataman.restoreSelectionFromIDs(this.tree, this._getObjID, selectionCache);
     }
 
-    // Set attributes to the sorting we did
+    // Set attributes to the sorting we did.
     column.setAttribute("sortActive", "true");
     column.setAttribute("sortDirection", dirAscending ? "ascending" : "descending");
   },
@@ -1439,13 +1416,12 @@ var gPrefs = {
     this.tree.view.selection.clearSelection();
     // Loop backwards so later indexes in the list don't change.
     for (let i = selections.length - 1; i >= 0; i--) {
-      let delPref = this.prefs[this.displayedPrefs[selections[i]]];
-      this.prefs[this.displayedPrefs[selections[i]]] = null;
-      this.displayedPrefs.splice(selections[i], 1);
+      let delPref = this.prefs[selections[i]];
+      this.prefs.splice(selections[i], 1);
       this.tree.treeBoxObject.rowCountChanged(selections[i], -1);
       Services.contentPrefs.removePref(delPref.host, delPref.name);
     }
-    if (!this.displayedPrefs.length)
+    if (!this.prefs.length)
       gDomains.removeDomainOrFlag(gDomains.selectedDomain.title, "hasPreferences");
   },
 
@@ -1453,7 +1429,7 @@ var gPrefs = {
     document.getElementById("prefs-context-remove").disabled =
       this.removeButton.disabled;
     document.getElementById("prefs-context-selectall").disabled =
-      (this.tree.view.selection.count >= this.tree.view.rowCount);
+      this.tree.view.selection.count >= this.tree.view.rowCount;
   },
 
   reactToChange: function prefs_reactToChange(aSubject, aData) {
@@ -1462,19 +1438,19 @@ var gPrefs = {
     // Do "surgical" updates.
     let domain = gDomains.getDomainFromHost(aSubject.host);
     // Does change affect possibly loaded Preferences pane?
-    let affectsLoaded = this.displayedPrefs.length &&
+    let affectsLoaded = this.prefs.length &&
                         gDomains.hostMatchesSelected(aSubject.host);
-    let idx = -1; disp_idx = -1; domainPrefs = 0;
+    let idx = -1, domainPrefs = 0;
     if (affectsLoaded) {
-      for (let i = 0; i < this.displayedPrefs.length; i++) {
-        let cpref = this.prefs[this.displayedPrefs[i]];
+      for (let i = 0; i < this.prefs.length; i++) {
+        let cpref = this.prefs[i];
         if (cpref && cpref.host == aSubject.host && cpref.name == aSubject.name) {
-          idx = this.displayedPrefs[i]; disp_idx = i;
+          idx = this.prefs[i];
           break;
         }
       }
       if (aData == "prefRemoved")
-        domainPrefs = this.displayedPrefs.length;
+        domainPrefs = this.prefs.length;
     }
     else if (aData == "prefRemoved") {
       // See if there are any prefs left for that domain.
@@ -1490,7 +1466,7 @@ var gPrefs = {
           statement.params.hostName = domain;
           statement.params.hostMatch = "%." + statement.escapeStringForLIKE(domain, "/");
           while (statement.executeStep()) {
-            // now, get all prefs for that host
+            // Now, get all prefs for that host.
             let enumerator = Services.contentPrefs.getPrefs(statement.row["host"]).enumerator;
             if (enumerator.hasMoreElements())
               domainPrefs++;
@@ -1510,10 +1486,9 @@ var gPrefs = {
           this.tree.treeBoxObject.invalidateRow(disp_idx);
       }
       else if (aData == "prefRemoved") {
-        this.prefs[idx] = null;
+        this.prefs.splice(idx, 1);
         if (affectsLoaded) {
-          this.displayedPrefs.splice(disp_idx, 1);
-          this.tree.treeBoxObject.rowCountChanged(disp_idx, -1);
+          this.tree.treeBoxObject.rowCountChanged(idx, -1);
         }
         if (domainPrefs == 1)
           gDomains.removeDomainOrFlag(domain, "hasPreferences");
@@ -1523,7 +1498,6 @@ var gPrefs = {
       // Pref set, no prev index known - either new or existing pref domain.
       if (affectsLoaded) {
         this.prefs.push(aSubject);
-        this.displayedPrefs.push(this.prefs.length - 1);
         this.tree.treeBoxObject.rowCountChanged(this.prefs.length - 1, 1);
         this.sort(null, true, false);
       }
@@ -1536,7 +1510,7 @@ var gPrefs = {
   forget: function prefs_forget() {
     let delPrefs = [];
     try {
-      // get all groups (hosts) that match the domain
+      // Get all groups (hosts) that match the domain.
       let domain = gDomains.selectedDomain.title;
       if (domain == "*") {
         let enumerator =  Services.contentPrefs.getPrefs(null).enumerator;
@@ -1551,7 +1525,7 @@ var gPrefs = {
         statement.params.hostName = domain;
         statement.params.hostMatch = "%." + statement.escapeStringForLIKE(domain, "/");
         while (statement.executeStep()) {
-          // now, get all prefs for that host
+          // Now, get all prefs for that host.
           let enumerator =  Services.contentPrefs.getPrefs(statement.row["host"]).enumerator;
           while (enumerator.hasMoreElements()) {
             let pref = enumerator.getNext().QueryInterface(Components.interfaces.nsIProperty);
@@ -1572,10 +1546,10 @@ var gPrefs = {
   // nsITreeView
   __proto__: gBaseTreeView,
   get rowCount() {
-    return this.displayedPrefs.length;
+    return this.prefs.length;
   },
   getCellText: function(aRow, aColumn) {
-    let cpref = this.prefs[this.displayedPrefs[aRow]];
+    let cpref = this.prefs[aRow];
     switch (aColumn.id) {
       case "prefsHostCol":
         return cpref.host || "*";
@@ -1611,16 +1585,13 @@ var gPasswords = {
     this.pwdCol = document.getElementById("pwdPasswordCol");
 
     this.tree.treeBoxObject.beginUpdateBatch();
-    if (!this.allSignons)
-      this.loadList();
-    for (let i = 0; i < this.allSignons.length; i++) {
-      if (this.allSignons[i] &&
-          gDomains.hostMatchesSelected(this.allSignons[i].hostname))
-        this.displayedSignons.push(i);
-    }
+    // this.loadList() is being called in gDomains.initialize() already
+    this.displayedSignons = this.allSignons.filter(
+      function (aSignon) {
+        return gDomains.hostMatchesSelected(aSignon.hostname);
+      });
     this.sort(null, false, false);
     this.tree.treeBoxObject.endUpdateBatch();
-    this.tree.treeBoxObject.invalidate();
   },
 
   shutdown: function passwords_shutdown() {
@@ -1633,12 +1604,11 @@ var gPasswords = {
   },
 
   loadList: function passwords_loadList() {
-    this.allSignons = [];
     this.allSignons = gLocSvc.pwd.getAllLogins();
   },
 
   _getObjID: function passwords__getObjID(aIdx) {
-    var curSignon = gPasswords.allSignons[gPasswords.displayedSignons[aIdx]];
+    var curSignon = gPasswords.displayedSignons[aIdx];
     return curSignon.hostname + "|" + curSignon.httpRealm + "|" + curSignon.username;
   },
 
@@ -1659,7 +1629,7 @@ var gPasswords = {
   },
 
   sort: function passwords_sort(aColumn, aUpdateSelection, aInvertDirection) {
-    // make sure we have a valid column
+    // Make sure we have a valid column.
     let column = aColumn;
     if (!column) {
       let sortedCol = this.tree.columns.getSortedColumn();
@@ -1680,24 +1650,21 @@ var gPasswords = {
                        (aInvertDirection ? "ascending" : "descending");
     let dirFactor = dirAscending ? 1 : -1;
 
-    // Clear attributes on all columns, we're setting them again after sorting
+    // Clear attributes on all columns, we're setting them again after sorting.
     for (let node = column.parentNode.firstChild; node; node = node.nextSibling) {
       node.removeAttribute("sortActive");
       node.removeAttribute("sortDirection");
     }
 
-    // Compare function for two signons
+    // compare function for two signons
     let compfunc = function passwords_sort_compare(aOne, aTwo) {
       switch (column.id) {
         case "pwdHostCol":
-          return dirFactor * gPasswords.allSignons[aOne].hostname
-                             .localeCompare(gPasswords.allSignons[aTwo].hostname);
+          return dirFactor * aOne.hostname.localeCompare(aTwo.hostname);
         case "pwdUserCol":
-          return dirFactor * gPasswords.allSignons[aOne].username
-                             .localeCompare(gPasswords.allSignons[aTwo].username);
+          return dirFactor * aOne.username.localeCompare(aTwo.username);
         case "pwdPasswordCol":
-          return dirFactor * gPasswords.allSignons[aOne].password
-                             .localeCompare(gPasswords.allSignons[aTwo].password);
+          return dirFactor * aOne.password.localeCompare(aTwo.password);
       }
       return 0;
     };
@@ -1707,16 +1674,15 @@ var gPasswords = {
     }
     this.tree.view.selection.clearSelection();
 
-    // Do the actual sorting of the array
+    // Do the actual sorting of the array.
     this.displayedSignons.sort(compfunc);
     this.tree.treeBoxObject.invalidate();
 
     if (aUpdateSelection) {
-      gDataman.restoreSelectionFromIDs(this.tree, this._getObjID,
-                                            selectionCache);
+      gDataman.restoreSelectionFromIDs(this.tree, this._getObjID, selectionCache);
     }
 
-    // Set attributes to the sorting we did
+    // Set attributes to the sorting we did.
     column.setAttribute("sortActive", "true");
     column.setAttribute("sortDirection", dirAscending ? "ascending" : "descending");
   },
@@ -1739,8 +1705,8 @@ var gPasswords = {
     this.tree.view.selection.clearSelection();
     // Loop backwards so later indexes in the list don't change.
     for (let i = selections.length - 1; i >= 0; i--) {
-      let delSignon = this.allSignons[this.displayedSignons[selections[i]]];
-      this.allSignons[this.displayedSignons[selections[i]]] = null;
+      let delSignon = this.displayedSignons[selections[i]];
+      this.allSignons.splice(this.allSignons.indexOf(this.displayedSignons[selections[i]]), 1);
       this.displayedSignons.splice(selections[i], 1);
       this.tree.treeBoxObject.rowCountChanged(selections[i], -1);
       gLocSvc.pwd.removeLogin(delSignon);
@@ -1763,7 +1729,7 @@ var gPasswords = {
   },
 
   _confirmShowPasswords: function passwords__confirmShowPasswords() {
-    // This doesn't harm if passwords are not encrypted
+    // This doesn't harm if passwords are not encrypted.
     let tokendb = Components.classes["@mozilla.org/security/pk11tokendb;1"]
                             .createInstance(Components.interfaces.nsIPK11TokenDB);
     let token = tokendb.getInternalKeyToken();
@@ -1789,7 +1755,7 @@ var gPasswords = {
   },
 
   _askUserShowPasswords: function passwords__askUserShowPasswords() {
-    // Confirm the user wants to display passwords
+    // Confirm the user wants to display passwords.
     return Services.prompt.confirmEx(window,
                                      null,
                                      gDataman.bundle.getString("pwd.noMasterPasswordPrompt"),
@@ -1801,28 +1767,27 @@ var gPasswords = {
     document.getElementById("pwd-context-remove").disabled =
       this.removeButton.disabled;
     document.getElementById("pwd-context-copypassword").disabled =
-      (this.tree.view.selection.count != 1);
+      this.tree.view.selection.count != 1;
     document.getElementById("pwd-context-selectall").disabled =
-      (this.tree.view.selection.count >= this.tree.view.rowCount);
+      this.tree.view.selection.count >= this.tree.view.rowCount;
   },
 
   copyPassword: function passwords_copyPassword() {
-    // Copy selected signon's password to clipboard
+    // Copy selected signon's password to clipboard.
     let row = this.tree.currentIndex;
-    let password = gPasswords.allSignons[gPasswords.displayedSignons[row]].password;
+    let password = gPasswords.displayedSignons[row].password;
     gLocSvc.clipboard.copyString(password);
   },
 
   reactToChange: function passwords_reactToChange(aSubject, aData) {
     // aData: addLogin, modifyLogin, removeLogin, removeAllLogins
     if (aData == "removeAllLogins") {
-      // Go for re-parsing the whole thing
+      // Go for re-parsing the whole thing.
       if (this.displayedSignons.length) {
-        this.tree.view.selection.clearSelection();
         this.tree.treeBoxObject.beginUpdateBatch();
+        this.tree.view.selection.clearSelection();
         this.displayedSignons = [];
         this.tree.treeBoxObject.endUpdateBatch();
-        this.tree.treeBoxObject.invalidate();
       }
       this.loadList();
       let domainList = [];
@@ -1864,7 +1829,7 @@ var gPasswords = {
       this.allSignons.push(curLogin);
 
       if (affectsLoaded) {
-        this.displayedSignons.push(this.allSignons.length - 1);
+        this.displayedSignons.push(this.allSignons[this.allSignons.length - 1]);
         this.tree.treeBoxObject.rowCountChanged(this.allSignons.length - 1, 1);
         this.sort(null, true, false);
       }
@@ -1873,12 +1838,13 @@ var gPasswords = {
       }
     }
     else {
-      let idx = -1; disp_idx = -1; domainPasswords = 0;
+      let idx = -1, disp_idx = -1, domainPasswords = 0;
       if (affectsLoaded) {
         for (let i = 0; i < this.displayedSignons.length; i++) {
-          let signon = this.allSignons[this.displayedSignons[i]];
+          let signon = this.displayedSignons[i];
           if (signon && signon.equals(oldLogin)) {
-            idx = this.displayedSignons[i]; disp_idx = i;
+            idx = this.allSignons.indexOf(this.displayedSignons[i]);
+            disp_idx = i;
             break;
           }
         }
@@ -1905,7 +1871,7 @@ var gPasswords = {
             this.tree.treeBoxObject.invalidateRow(disp_idx);
         }
         else if (aData == "removeLogin") {
-          this.allSignons[idx] = null;
+          this.allSignons.splice(idx, 1);
           if (affectsLoaded) {
             this.displayedSignons.splice(disp_idx, 1);
             this.tree.treeBoxObject.rowCountChanged(disp_idx, -1);
@@ -1919,10 +1885,9 @@ var gPasswords = {
 
   forget: function passwords_forget() {
     for (let i = 0; i < this.allSignons.length; i++) {
-      if (this.allSignons[i] &&
-          gDomains.hostMatchesSelected(this.allSignons[i].hostname)) {
+      if (gDomains.hostMatchesSelected(this.allSignons[i].hostname)) {
         gLocSvc.pwd.removeLogin(this.allSignons[i]);
-        this.allSignons[i] = null;
+        this.allSignons.splice(i, 1);
       }
     }
     gDomains.removeDomainOrFlag(gDomains.selectedDomain.title, "hasPasswords");
@@ -1934,7 +1899,7 @@ var gPasswords = {
     return this.displayedSignons.length;
   },
   getCellText: function(aRow, aColumn) {
-    let signon = this.allSignons[this.displayedSignons[aRow]];
+    let signon = this.displayedSignons[aRow];
     switch (aColumn.id) {
       case "pwdHostCol":
         return signon.httpRealm ?
@@ -2004,8 +1969,8 @@ var gFormdata = {
       let date = new Date(aTimestamp / 1000);
 
       // If a date has an extreme value, the dateservice can't cope with it
-      // properly, so we'll just return a blank string
-      // see bug 238045 for details
+      // properly, so we'll just return a blank string.
+      // See bug 238045 for details.
       let dtString = "";
       try {
         dtString = gLocSvc.date.FormatDateTime("", gLocSvc.date.dateFormatLong,
@@ -2013,16 +1978,14 @@ var gFormdata = {
                                                date.getFullYear(), date.getMonth()+1,
                                                date.getDate(), date.getHours(),
                                                date.getMinutes(), date.getSeconds());
-      } catch(ex) {
-        // do nothing
-      }
+      } catch(ex) {}
       return dtString;
     }
     return "";
   },
 
   _getObjID: function formdata__getObjID(aIdx) {
-    return gFormdata.formdata[gFormdata.displayedFormdata[aIdx]].guid;
+    return gFormdata.displayedFormdata[aIdx].guid;
   },
 
   select: function formdata_select() {
@@ -2042,7 +2005,7 @@ var gFormdata = {
   },
 
   sort: function formdata_sort(aColumn, aUpdateSelection, aInvertDirection) {
-    // make sure we have a valid column
+    // Make sure we have a valid column.
     let column = aColumn;
     if (!column) {
       let sortedCol = this.tree.columns.getSortedColumn();
@@ -2063,30 +2026,25 @@ var gFormdata = {
                        (aInvertDirection ? "ascending" : "descending");
     let dirFactor = dirAscending ? 1 : -1;
 
-    // Clear attributes on all columns, we're setting them again after sorting
+    // Clear attributes on all columns, we're setting them again after sorting.
     for (let node = column.parentNode.firstChild; node; node = node.nextSibling) {
       node.removeAttribute("sortActive");
       node.removeAttribute("sortDirection");
     }
 
-    // Compare function for two formdata items
+    // compare function for two formdata items
     let compfunc = function formdata_sort_compare(aOne, aTwo) {
       switch (column.id) {
         case "fdataFieldCol":
-          return dirFactor * gFormdata.formdata[aOne].fieldname
-                             .localeCompare(gFormdata.formdata[aTwo].fieldname);
+          return dirFactor * aOne.fieldname.localeCompare(aTwo.fieldname);
         case "fdataValueCol":
-          return dirFactor * gFormdata.formdata[aOne].value
-                             .localeCompare(gFormdata.formdata[aTwo].value);
+          return dirFactor * aOne.value.localeCompare(aTwo.value);
         case "fdataCountCol":
-          return dirFactor * (gFormdata.formdata[aOne].timesUsed -
-                              gFormdata.formdata[aTwo].timesUsed);
+          return dirFactor * (aOne.timesUsed - aTwo.timesUsed);
         case "fdataFirstCol":
-          return dirFactor * (gFormdata.formdata[aOne].firstUsedSortValue -
-                              gFormdata.formdata[aTwo].firstUsedSortValue);
+          return dirFactor * (aOne.firstUsedSortValue - aTwo.firstUsedSortValue);
         case "fdataLastCol":
-          return dirFactor * (gFormdata.formdata[aOne].lastUsedSortValue -
-                              gFormdata.formdata[aTwo].lastUsedSortValue);
+          return dirFactor * (aOne.lastUsedSortValue - aTwo.lastUsedSortValue);
       }
       return 0;
     };
@@ -2096,16 +2054,15 @@ var gFormdata = {
     }
     this.tree.view.selection.clearSelection();
 
-    // Do the actual sorting of the array
+    // Do the actual sorting of the array.
     this.displayedFormdata.sort(compfunc);
     this.tree.treeBoxObject.invalidate();
 
     if (aUpdateSelection) {
-      gDataman.restoreSelectionFromIDs(this.tree, this._getObjID,
-                                            selectionCache);
+      gDataman.restoreSelectionFromIDs(this.tree, this._getObjID, selectionCache);
     }
 
-    // Set attributes to the sorting we did
+    // Set attributes to the sorting we did.
     column.setAttribute("sortActive", "true");
     column.setAttribute("sortDirection", dirAscending ? "ascending" : "descending");
   },
@@ -2128,8 +2085,8 @@ var gFormdata = {
     this.tree.view.selection.clearSelection();
     // Loop backwards so later indexes in the list don't change.
     for (let i = selections.length - 1; i >= 0; i--) {
-      let delFData = this.formdata[this.displayedFormdata[selections[i]]];
-      this.formdata[this.displayedFormdata[selections[i]]] = null;
+      let delFData = this.displayedFormdata[selections[i]];
+      this.formdata.splice(this.formdata.indexOf(this.displayedFormdata[selections[i]]), 1);
       this.displayedFormdata.splice(selections[i], 1);
       this.tree.treeBoxObject.rowCountChanged(selections[i], -1);
       gLocSvc.fhist.removeEntry(delFData.fieldname, delFData.value);
@@ -2137,21 +2094,18 @@ var gFormdata = {
   },
 
   search: function formdata_search(aSearchString) {
-    var selectionCache = gDataman.getSelectedIDs(this.tree, this._getObjID);
-    this.tree.view.selection.clearSelection();
+    let selectionCache = gDataman.getSelectedIDs(this.tree, this._getObjID);
     this.tree.treeBoxObject.beginUpdateBatch();
-    this.displayedFormdata = [];
+    this.tree.view.selection.clearSelection();
     var lcSearch = aSearchString.toLocaleLowerCase();
-    for (let i = 0; i < this.formdata.length; i++) {
-      if (this.formdata[i] &&
-          (this.formdata[i].fieldname.toLocaleLowerCase().indexOf(lcSearch) != -1 ||
-           this.formdata[i].value.toLocaleLowerCase().indexOf(lcSearch) != -1))
-        this.displayedFormdata.push(i);
-    }
+    this.displayedFormdata = this.formdata.filter(
+      function(aFd) {
+        return aFd.fieldname.toLocaleLowerCase().indexOf(lcSearch) != -1 ||
+               aFd.value.toLocaleLowerCase().indexOf(lcSearch) != -1;
+      });
     this.sort(null, false, false);
+    gDataman.restoreSelectionFromIDs(this.tree, this._getObjID, selectionCache);
     this.tree.treeBoxObject.endUpdateBatch();
-    gDataman.restoreSelectionFromIDs(this.tree, this._getObjID,
-                                          selectionCache);
   },
 
   focusSearch: function formdata_focusSearch() {
@@ -2162,7 +2116,7 @@ var gFormdata = {
     document.getElementById("fdata-context-remove").disabled =
       this.removeButton.disabled;
     document.getElementById("fdata-context-selectall").disabled =
-      (this.tree.view.selection.count >= this.tree.view.rowCount);
+      this.tree.view.selection.count >= this.tree.view.rowCount;
   },
 
   reactToChange: function formdata_reactToChange(aSubject, aData) {
@@ -2178,12 +2132,11 @@ var gFormdata = {
 
     if (aData == "removeAllEntries" || aData == "removeEntriesForName" ||
         aData == "removeEntriesByTimeframe" || aData == "expireOldEntries") {
-      // Go for re-parsing the whole thing
-      this.tree.view.selection.clearSelection();
+      // Go for re-parsing the whole thing.
       this.tree.treeBoxObject.beginUpdateBatch();
+      this.tree.view.selection.clearSelection();
       this.displayedFormdata = [];
       this.tree.treeBoxObject.endUpdateBatch();
-      this.tree.treeBoxObject.invalidate();
 
       this.loadList();
       this.search("");
@@ -2191,7 +2144,7 @@ var gFormdata = {
     }
 
     // Usual notifications for addEntry, modifyEntry, removeEntry - do "surgical" updates.
-    let subjectData = []; // those notifications all have: name, value, guid
+    let subjectData = []; // Those notifications all have: name, value, guid.
     if (aSubject instanceof Components.interfaces.nsIArray) {
       let enumerator = aSubject.enumerate();
       while (enumerator.hasMoreElements()) {
@@ -2237,16 +2190,17 @@ var gFormdata = {
     if (aData == "addEntry") {
       this.formdata.push(entryData);
 
-      this.displayedFormdata.push(this.formdata.length - 1);
+      this.displayedFormdata.push(this.formdata[this.formdata.length - 1]);
       this.tree.treeBoxObject.rowCountChanged(this.formdata.length - 1, 1);
       this.search("");
     }
     else {
-      let idx = -1; disp_idx = -1;
+      let idx = -1, disp_idx = -1;
       for (let i = 0; i < this.displayedFormdata.length; i++) {
-        let fdata = this.formdata[this.displayedFormdata[i]];
+        let fdata = this.displayedFormdata[i];
         if (fdata && fdata.guid == subjectData[2]) {
-          idx = this.displayedFormdata[i]; disp_idx = i;
+          idx = this.formdata.indexOf(this.displayedFormdata[i]);
+          disp_idx = i;
           break;
         }
       }
@@ -2256,7 +2210,7 @@ var gFormdata = {
           this.tree.treeBoxObject.invalidateRow(disp_idx);
         }
         else if (aData == "removeEntry") {
-          this.formdata[idx] = null;
+          this.formdata.splice(idx, 1);
           this.displayedFormdata.splice(disp_idx, 1);
           this.tree.treeBoxObject.rowCountChanged(disp_idx, -1);
         }
@@ -2274,7 +2228,7 @@ var gFormdata = {
     return this.displayedFormdata.length;
   },
   getCellText: function(aRow, aColumn) {
-    let fdata = this.formdata[this.displayedFormdata[aRow]];
+    let fdata = this.displayedFormdata[aRow];
     switch (aColumn.id) {
       case "fdataFieldCol":
         return fdata.fieldname;
