@@ -69,7 +69,9 @@ function test() {
 
   gBrowser.addTab();
   // Open the Data Manager, testing the menu item.
-  document.getElementById("tasksDataman").click();
+  let menuitem = document.getElementById("tasksDataman") ||
+                 document.getElementById("menu_openDataman");
+  menuitem.click();
 
   var testIndex = 0;
   var win;
