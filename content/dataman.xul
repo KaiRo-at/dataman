@@ -58,7 +58,7 @@
 
   <stringbundleset id="datamanBundleSet">
     <stringbundle id="datamanBundle"
-                  src="chrome://chrome://dataman/locale/dataman.properties"/>
+                  src="chrome://dataman/locale/dataman.properties"/>
   </stringbundleset>
 
   <commandset id="datamanCommands">
