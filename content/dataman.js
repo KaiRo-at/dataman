@@ -72,6 +72,7 @@ XPCOMUtils.defineLazyServiceGetter(gLocSvc, "clipboard",
 var gDataman = {
   bundle: null,
   debug: false,
+  loadViewOnInit: null,
 
   initialize: function dataman_initialize() {
     try {
@@ -98,6 +99,17 @@ var gDataman = {
     Services.obs.removeObserver(this, "satchel-storage-changed");
 
     gDomains.shutdown();
+  },
+
+  loadView: function dataman_loadView(aView) {
+    // Set variable, used in initizalization routine.
+    // Syntax: <domain>:<pane> (:<pane> is optional)
+    // Examples: example.com
+    //           example.org:permissions
+    // Allowed pane names:
+    //   cookies, permissions, preferences, passwords, formdata
+    // Invalid views fall back to the default available ones
+    this.loadViewOnInit = aView;
   },
 
   debugMsg: function dataman_debugMsg(aLogMessage) {
@@ -152,7 +164,7 @@ var gDataman = {
   getTreeSelections: function dataman_getTreeSelections(aTree) {
     let selections = [];
     let select = aTree.view.selection;
-    if (select) {
+    if (select && aTree.view.rowCount) {
       let count = select.getRangeCount();
       let min = {};
       let max = {};
@@ -169,7 +181,7 @@ var gDataman = {
   getSelectedIDs: function dataman_getSelectedIDs(aTree, aIDFunction) {
     // Get IDs of selected elements for later restoration.
     let selectionCache = [];
-    if (aTree.view.selection.count < 1)
+    if (aTree.view.selection.count < 1 || aTree.view.rowCount < 1)
       return selectionCache;
 
     // Walk all selected rows and cache their IDs.
@@ -239,7 +251,8 @@ var gDomains = {
                                hasPreferences: Services.contentPrefs.getPrefs(null).enumerator.hasMoreElements(),
                                hasFormData: true};
     this.search("");
-    this.tree.view.selection.select(0);
+    if (!gDataman.loadViewOnInit)
+      this.tree.view.selection.select(0);
 
     let loaderInstance;
     function nextStep() {
@@ -306,6 +319,25 @@ var gDomains = {
 
       // Send a notification that we finished.
       gDataman.debugMsg("Domain list built: " + Date.now()/1000);
+      var loadDomain, loadPane;
+      if (gDataman.loadViewOnInit) {
+        [loadDomain, loadPane] = gDataman.loadViewOnInit.split(':', 2);
+        for (let i = 0; i < gDomains.displayedDomains.length; i++) {
+          if (gDomains.displayedDomains[i].title == loadDomain) {
+            gDomains.tree.view.selection.select(i);
+            break;
+          }
+        }
+      }
+      yield setTimeout(nextStep, 0);
+
+      if (loadPane) {
+        let loadTabID = loadPane + "Tab";
+        if (gTabs[loadTabID] && !gTabs[loadTabID].disabled)
+          gTabs.tabbox.selectedTab = gTabs[loadTabID];
+      }
+      yield setTimeout(nextStep, 0);
+
       Services.obs.notifyObservers(window, "dataman-loaded", null);
       yield;
     }
@@ -745,7 +777,8 @@ var gCookies = {
                                              date.getFullYear(), date.getMonth()+1,
                                              date.getDate(), date.getHours(),
                                              date.getMinutes(), date.getSeconds());
-      } catch(ex) {}
+      }
+      catch (e) {}
       return expiry;
     }
     return gDataman.bundle.getString("cookies.expireAtEndOfSession");
@@ -887,6 +920,11 @@ var gCookies = {
     }
     if (!this.displayedCookies.length)
       gDomains.removeDomainOrFlag(gDomains.selectedDomain.title, "hasCookies");
+    // Select the entry after the first deleted one or the last of all entries.
+    if (selections.length && this.displayedCookies.length)
+      this.tree.view.selection.toggleSelect(selections[0] < this.displayedCookies.length ?
+                                            selections[0] :
+                                            this.displayedCookies.length - 1);
   },
 
   updateContext: function cookies_updateContext() {
@@ -1028,7 +1066,7 @@ var gCookies = {
 var gPerms = {
   list: null,
 
-  initialize: function() {
+  initialize: function permissions_initialize() {
     gDataman.debugMsg("Initializing permissions panel");
     this.list = document.getElementById("permList");
 
@@ -1062,7 +1100,7 @@ var gPerms = {
     }
   },
 
-  shutdown: function() {
+  shutdown: function permissions_shutdown() {
     gDataman.debugMsg("Shutting down permissions panel");
     // XXX: Here we could detect if we still hold any non-default settings and
     //      trigger the removeDomainOrFlag if not.
@@ -1108,7 +1146,7 @@ var gPerms = {
       aSubject.QueryInterface(Components.interfaces.nsISupportsString);
       let domain = gDomains.getDomainFromHost(aSubject.data);
       // Does change affect possibly loaded Preferences pane?
-      let affectsLoaded = this.list.childElementCount &&
+      let affectsLoaded = this.list && this.list.childElementCount &&
                           gDomains.hostMatchesSelected(aSubject.data);
       let permElem = null;
       if (affectsLoaded) {
@@ -1180,7 +1218,7 @@ var gPerms = {
       let rawHost = aSubject.host.replace(/^\./, "");
       let domain = gDomains.getDomainFromHost(rawHost);
       // Does change affect possibly loaded Preferences pane?
-      let affectsLoaded = this.list.childElementCount &&
+      let affectsLoaded = this.list && this.list.childElementCount &&
                           gDomains.hostMatchesSelected(rawHost);
       let permElem = null;
       if (affectsLoaded) {
@@ -1423,6 +1461,11 @@ var gPrefs = {
     }
     if (!this.prefs.length)
       gDomains.removeDomainOrFlag(gDomains.selectedDomain.title, "hasPreferences");
+    // Select the entry after the first deleted one or the last of all entries.
+    if (selections.length && this.prefs.length)
+      this.tree.view.selection.toggleSelect(selections[0] < this.prefs.length ?
+                                            selections[0] :
+                                            this.prefs.length - 1);
   },
 
   updateContext: function prefs_updateContext() {
@@ -1713,6 +1756,11 @@ var gPasswords = {
     }
     if (!this.displayedSignons.length)
       gDomains.removeDomainOrFlag(gDomains.selectedDomain.title, "hasPasswords");
+    // Select the entry after the first deleted one or the last of all entries.
+    if (selections.length && this.displayedSignons.length)
+      this.tree.view.selection.toggleSelect(selections[0] < this.displayedSignons.length ?
+                                            selections[0] :
+                                            this.displayedSignons.length - 1);
   },
 
   togglePasswordVisible: function passwords_togglePasswordVisible() {
@@ -1746,7 +1794,8 @@ var gPasswords = {
       token.login(true);  // 'true' means always prompt for token password. User
                           // will be prompted until clicking 'Cancel' or
                           // entering the correct password.
-    } catch (e) {
+    }
+    catch (e) {
       // An exception will be thrown if the user cancels the login prompt dialog.
       // User is also logged out of Software Security Device.
     }
@@ -1756,8 +1805,7 @@ var gPasswords = {
 
   _askUserShowPasswords: function passwords__askUserShowPasswords() {
     // Confirm the user wants to display passwords.
-    return Services.prompt.confirmEx(window,
-                                     null,
+    return Services.prompt.confirmEx(window, null,
                                      gDataman.bundle.getString("pwd.noMasterPasswordPrompt"),
                                      Services.prompt.STD_YES_NO_BUTTONS,
                                      null, null, null, null, { value: false }) == 0; // 0=="Yes" button
@@ -1978,7 +2026,8 @@ var gFormdata = {
                                                date.getFullYear(), date.getMonth()+1,
                                                date.getDate(), date.getHours(),
                                                date.getMinutes(), date.getSeconds());
-      } catch(ex) {}
+      }
+      catch (e) {}
       return dtString;
     }
     return "";
@@ -2091,6 +2140,11 @@ var gFormdata = {
       this.tree.treeBoxObject.rowCountChanged(selections[i], -1);
       gLocSvc.fhist.removeEntry(delFData.fieldname, delFData.value);
     }
+    // Select the entry after the first deleted one or the last of all entries.
+    if (selections.length && this.displayedFormdata.length)
+      this.tree.view.selection.toggleSelect(selections[0] < this.displayedFormdata.length ?
+                                            selections[0] :
+                                            this.displayedFormdata.length - 1);
   },
 
   search: function formdata_search(aSearchString) {
@@ -2287,15 +2341,19 @@ var gForget = {
     this.forgetPasswords.disabled = !gDomains.selectedDomain.hasPasswords;
     this.forgetFormdata.disabled = !gDomains.selectedDomain.hasFormData;
     this.forgetFormdata.hidden = !gDomains.selectedDomain.hasFormData;
-    this.forgetButton.disabled = !(gDomains.selectedDomain.hasCookies ||
-                                   gDomains.selectedDomain.hasPermissions ||
-                                   gDomains.selectedDomain.hasPreferences ||
-                                   gDomains.selectedDomain.hasPasswords ||
-                                   gDomains.selectedDomain.hasFormData);
+    this.updateOptions();
   },
 
   shutdown: function forget_shutdown() {
     gDataman.debugMsg("Shutting down forget panel");
+  },
+
+  updateOptions: function forget_updateOptions() {
+    this.forgetButton.disabled = !(this.forgetCookies.checked ||
+                                   this.forgetPermissions.checked ||
+                                   this.forgetPreferences.checked ||
+                                   this.forgetPasswords.checked ||
+                                   this.forgetFormdata.checked);
   },
 
   forget: function forget_forget() {

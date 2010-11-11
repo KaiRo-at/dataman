@@ -50,13 +50,15 @@
 
 <page xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
       id="dataman-page" title="&dataman.windowTitle;"
-      onload="gDataman.initialize();" onunload="gDataman.shutdown();">
+      onload="gDataman.initialize();"
+      onunload="gDataman.shutdown();">
 
   <script type="application/javascript"
           src="chrome://dataman/content/dataman.js"/>
 
   <stringbundleset id="datamanBundleSet">
-    <stringbundle id="datamanBundle" src="chrome://dataman/locale/dataman.properties"/>
+    <stringbundle id="datamanBundle"
+                  src="chrome://chrome://dataman/locale/dataman.properties"/>
   </stringbundleset>
 
   <commandset id="datamanCommands">
@@ -85,7 +87,7 @@
 
   <popupset id="datamanContextSet">
     <menupopup id="domainTreeContextMenu"
-               onpopupshowing="gDomains.updateContext()">
+               onpopupshowing="gDomains.updateContext();">
       <menuitem id="domain-context-forget"
                 label_domain="&domain.ctx.forgetdomain.label;"
                 accesskey_domain="&domain.ctx.forgetdomain.accesskey;"
@@ -95,7 +97,7 @@
     </menupopup>
 
     <menupopup id="cookiesTreeContextMenu"
-               onpopupshowing="gCookies.updateContext()">
+               onpopupshowing="gCookies.updateContext();">
       <menuitem id="cookies-context-remove"
                 label="&cookies.ctx.remove.label;"
                 accesskey="&cookies.ctx.remove.accesskey;"
@@ -103,11 +105,11 @@
       <menuitem id="cookies-context-selectall"
                 label="&cookies.ctx.selectAll.label;"
                 accesskey="&cookies.ctx.selectAll.accesskey;"
-                oncommand="gCookies.selectAll()"/>
+                oncommand="gCookies.selectAll();"/>
     </menupopup>
 
     <menupopup id="prefsTreeContextMenu"
-               onpopupshowing="gPrefs.updateContext()">
+               onpopupshowing="gPrefs.updateContext();">
       <menuitem id="prefs-context-remove"
                 label="&prefs.ctx.remove.label;"
                 accesskey="&prefs.ctx.remove.accesskey;"
@@ -115,11 +117,11 @@
       <menuitem id="prefs-context-selectall"
                 label="&prefs.ctx.selectAll.label;"
                 accesskey="&prefs.ctx.selectAll.accesskey;"
-                oncommand="gPrefs.selectAll()"/>
+                oncommand="gPrefs.selectAll();"/>
     </menupopup>
 
     <menupopup id="passwordsTreeContextMenu"
-               onpopupshowing="gPasswords.updateContext()">
+               onpopupshowing="gPasswords.updateContext();">
       <menuitem id="pwd-context-remove"
                 label="&pwd.ctx.remove.label;"
                 accesskey="&pwd.ctx.remove.accesskey;"
@@ -127,15 +129,15 @@
       <menuitem id="pwd-context-copypassword"
                 label="&pwd.ctx.copyPasswordCmd.label;"
                 accesskey="&pwd.ctx.copyPasswordCmd.accesskey;"
-                oncommand="gPasswords.copyPassword()"/>
+                oncommand="gPasswords.copyPassword();"/>
       <menuitem id="pwd-context-selectall"
                 label="&pwd.ctx.selectAll.label;"
                 accesskey="&pwd.ctx.selectAll.accesskey;"
-                oncommand="gPasswords.selectAll()"/>
+                oncommand="gPasswords.selectAll();"/>
     </menupopup>
 
     <menupopup id="formdataTreeContextMenu"
-               onpopupshowing="gFormdata.updateContext()">
+               onpopupshowing="gFormdata.updateContext();">
       <menuitem id="fdata-context-remove"
                 label="&fdata.ctx.remove.label;"
                 accesskey="&fdata.ctx.remove.accesskey;"
@@ -143,7 +145,7 @@
       <menuitem id="fdata-context-selectall"
                 label="&fdata.ctx.selectAll.label;"
                 accesskey="&fdata.ctx.selectAll.accesskey;"
-                oncommand="gFormdata.selectAll()"/>
+                oncommand="gFormdata.selectAll();"/>
     </menupopup>
   </popupset>
 
@@ -155,14 +157,17 @@
                class="compact"
                placeholder="&domain.search.placeholder;"
                oncommand="gDomains.search(this.value);"/>
-      <tree id="domainTree" flex="1"
+      <tree id="domainTree"
             seltype="single"
-            onkeypress="gDomains.handleKeyPress(event)"
+            flex="1"
+            hidecolumnpicker="true"
+            onkeypress="gDomains.handleKeyPress(event);"
             onselect="gDomains.select();"
             context="domainTreeContextMenu">
         <treecols>
-          <treecol id="domainCol" flex="1"
+          <treecol id="domainCol"
                    label="&domain.tree.domain.label;"
+                   flex="1"
                    sortDirection="ascending"/>
         </treecols>
         <treechildren/>
@@ -184,22 +189,27 @@
       <tabpanels id="tabpanels" flex="1">
         <vbox id="cookiesPanel">
           <description>&cookies.description;</description>
-          <tree id="cookiesTree" flex="1"
-                onkeypress="gCookies.handleKeyPress(event)"
+          <tree id="cookiesTree"
+                flex="1"
+                onkeypress="gCookies.handleKeyPress(event);"
                 onselect="gCookies.select();"
                 context="cookiesTreeContextMenu">
-            <treecols onclick="gCookies.sort(event.target, true, true)">
-              <treecol id="cookieHostCol" flex="5"
+            <treecols onclick="gCookies.sort(event.target, true, true);">
+              <treecol id="cookieHostCol"
                        label="&cookies.tree.host.label;"
+                       flex="5"
                        persist="width hidden"/>
               <splitter class="tree-splitter"/>
-              <treecol id="cookieNameCol" flex="5"
+              <treecol id="cookieNameCol"
                        label="&cookies.tree.name.label;"
+                       flex="5"
                        persist="width hidden"/>
               <splitter class="tree-splitter"/>
-              <treecol id="cookieExpiresCol" flex="10"
+              <treecol id="cookieExpiresCol"
                        label="&cookies.tree.expires.label;"
-                       hidden="true" persist="width hidden"/>
+                       flex="10"
+                       hidden="true"
+                       persist="width hidden"/>
             </treecols>
             <treechildren/>
           </tree>
@@ -215,21 +225,24 @@
               <rows>
                 <row align="center">
                   <hbox pack="end">
-                    <label value="&cookies.info.name.label;" control="cookieInfoName"/>
+                    <label value="&cookies.info.name.label;"
+                           control="cookieInfoName"/>
                   </hbox>
                   <textbox id="cookieInfoName" readonly="true" class="plain"/>
                 </row>
 
                 <row align="center">
                   <hbox pack="end">
-                    <label value="&cookies.info.value.label;" control="cookieInfoValue"/>
+                    <label value="&cookies.info.value.label;"
+                           control="cookieInfoValue"/>
                   </hbox>
                   <textbox id="cookieInfoValue" readonly="true" class="plain"/>
                 </row>
 
                 <row align="center">
                   <hbox pack="end">
-                    <label id="cookieInfoHostLabel" value="&cookies.info.host.label;"
+                    <label id="cookieInfoHostLabel"
+                           value="&cookies.info.host.label;"
                            value_host="&cookies.info.host.label;"
                            value_domain="&cookies.info.domain.label;"
                            control="cookieInfoHost"/>
@@ -239,21 +252,24 @@
 
                 <row align="center">
                   <hbox pack="end">
-                    <label value="&cookies.info.path.label;" control="cookieInfoPath"/>
+                    <label value="&cookies.info.path.label;"
+                           control="cookieInfoPath"/>
                   </hbox>
                   <textbox id="cookieInfoPath" readonly="true" class="plain"/>
                 </row>
 
                 <row align="center">
                   <hbox pack="end">
-                    <label value="&cookies.info.sendtype.label;" control="cookieInfoSendType"/>
+                    <label value="&cookies.info.sendtype.label;"
+                           control="cookieInfoSendType"/>
                   </hbox>
                   <textbox id="cookieInfoSendType" readonly="true" class="plain"/>
                 </row>
 
                 <row align="center">
                   <hbox pack="end">
-                    <label value="&cookies.info.expires.label;" control="cookieInfoExpires"/>
+                    <label value="&cookies.info.expires.label;"
+                           control="cookieInfoExpires"/>
                   </hbox>
                   <textbox id="cookieInfoExpires" readonly="true" class="plain"/>
                 </row>
@@ -262,9 +278,10 @@
           </groupbox>
 
           <hbox id="cookieButtons" align="center">
-            <button id="cookieRemove" disabled="true"
+            <button id="cookieRemove"
                     label="&cookies.button.remove.label;"
                     accesskey="&cookies.button.remove.accesskey;"
+                    disabled="true"
                     oncommand="gCookies.delete();"/>
             <checkbox id="cookieBlockOnRemove"
                       label="&cookies.blockOnRemove.label;"
@@ -279,58 +296,70 @@
 
         <vbox id="preferencesPanel">
           <description>&prefs.description;</description>
-          <tree id="prefsTree" flex="1"
-                onkeypress="gPrefs.handleKeyPress(event)"
+          <tree id="prefsTree"
+                flex="1"
+                onkeypress="gPrefs.handleKeyPress(event);"
                 onselect="gPrefs.select();"
                 context="prefsTreeContextMenu">
-            <treecols onclick="gPrefs.sort(event.target, true, true)">
-              <treecol id="prefsHostCol" flex="5"
+            <treecols onclick="gPrefs.sort(event.target, true, true);">
+              <treecol id="prefsHostCol"
                        label="&prefs.tree.host.label;"
+                       flex="5"
                        persist="width hidden"/>
               <splitter class="tree-splitter"/>
-              <treecol id="prefsNameCol" flex="5"
+              <treecol id="prefsNameCol"
                        label="&prefs.tree.name.label;"
+                       flex="5"
                        persist="width hidden"/>
               <splitter class="tree-splitter"/>
-              <treecol id="prefsValueCol" flex="10"
+              <treecol id="prefsValueCol"
                        label="&prefs.tree.value.label;"
+                       flex="10"
                        persist="width hidden"/>
             </treecols>
             <treechildren/>
           </tree>
           <hbox id="prefsButtons">
-            <button id="prefsRemove" disabled="true"
+            <button id="prefsRemove"
                     label="&prefs.button.remove.label;"
                     accesskey="&prefs.button.remove.accesskey;"
+                    disabled="true"
                     oncommand="gPrefs.delete();"/>
           </hbox>
         </vbox>
 
         <vbox id="passwordsPanel">
           <description>&pwd.description;</description>
-          <tree id="passwordsTree" flex="1" hidecolumnpicker="true"
-                onkeypress="gPasswords.handleKeyPress(event)"
+          <tree id="passwordsTree"
+                flex="1"
+                hidecolumnpicker="true"
+                onkeypress="gPasswords.handleKeyPress(event);"
                 onselect="gPasswords.select();"
                 context="passwordsTreeContextMenu">
-            <treecols onclick="gPasswords.sort(event.target, true, true)">
-              <treecol id="pwdHostCol" flex="5"
+            <treecols onclick="gPasswords.sort(event.target, true, true);">
+              <treecol id="pwdHostCol"
                        label="&pwd.tree.host.label;"
+                       flex="5"
                        persist="width"/>
               <splitter class="tree-splitter"/>
-              <treecol id="pwdUserCol" flex="2"
+              <treecol id="pwdUserCol"
                        label="&pwd.tree.username.label;"
+                       flex="2"
                        persist="width"/>
               <splitter class="tree-splitter"/>
-              <treecol id="pwdPasswordCol" flex="2"
+              <treecol id="pwdPasswordCol"
                        label="&pwd.tree.password.label;"
-                       hidden="true" persist="width"/>
+                       flex="2"
+                       hidden="true"
+                       persist="width"/>
             </treecols>
             <treechildren/>
           </tree>
           <hbox id="passwordButtons">
-            <button id="pwdRemove" disabled="true"
+            <button id="pwdRemove"
                     label="&pwd.button.remove.label;"
                     accesskey="&pwd.button.remove.accesskey;"
+                    disabled="true"
                     oncommand="gPasswords.delete();"/>
             <spacer flex="1"/>
             <button id="pwdToggle"
@@ -345,37 +374,47 @@
                    class="compact"
                    placeholder="&fdata.search.placeholder;"
                    oncommand="gFormdata.search(this.value);"/>
-          <tree id="formdataTree" flex="1"
-                onkeypress="gFormdata.handleKeyPress(event)"
+          <tree id="formdataTree"
+                flex="1"
+                onkeypress="gFormdata.handleKeyPress(event);"
                 onselect="gFormdata.select();"
                 context="formdataTreeContextMenu">
-            <treecols onclick="gFormdata.sort(event.target, true, true)">
-              <treecol id="fdataFieldCol" flex="5"
+            <treecols onclick="gFormdata.sort(event.target, true, true);">
+              <treecol id="fdataFieldCol"
                        label="&fdata.tree.fieldname.label;"
+                       flex="5"
                        persist="width hidden"/>
               <splitter class="tree-splitter"/>
-              <treecol id="fdataValueCol" flex="10"
+              <treecol id="fdataValueCol"
                        label="&fdata.tree.value.label;"
+                       flex="10"
                        persist="width hidden"/>
               <splitter class="tree-splitter"/>
-              <treecol id="fdataCountCol" flex="2"
+              <treecol id="fdataCountCol"
                        label="&fdata.tree.usecount.label;"
-                       hidden="true" persist="width hidden"/>
+                       flex="2"
+                       hidden="true"
+                       persist="width hidden"/>
               <splitter class="tree-splitter"/>
-              <treecol id="fdataFirstCol" flex="10"
+              <treecol id="fdataFirstCol"
                        label="&fdata.tree.firstused.label;"
-                       hidden="true" persist="width hidden"/>
+                       flex="10"
+                       hidden="true"
+                       persist="width hidden"/>
               <splitter class="tree-splitter"/>
-              <treecol id="fdataLastCol" flex="10"
+              <treecol id="fdataLastCol"
                        label="&fdata.tree.lastused.label;"
-                       hidden="true" persist="width hidden"/>
+                       flex="10"
+                       hidden="true"
+                       persist="width hidden"/>
             </treecols>
             <treechildren/>
           </tree>
           <hbox id="formdataButtons">
-            <button id="fdataRemove" disabled="true"
+            <button id="fdataRemove"
                     label="&fdata.button.remove.label;"
                     accesskey="&fdata.button.remove.accesskey;"
+                    disabled="true"
                     oncommand="gFormdata.delete();"/>
           </hbox>
         </vbox>
@@ -383,44 +422,61 @@
         <vbox id="forgetPanel">
           <description id="forgetDesc"/>
           <hbox>
-            <checkbox id="forgetCookies" disabled="true"
+            <checkbox id="forgetCookies"
                       label="&forget.cookies.label;"
-                      accesskey="&forget.cookies.accesskey;"/>
-            <label id="forgetCookiesLabel" hidden="true"
-                   value="&forget.cookies.label;"/>
+                      accesskey="&forget.cookies.accesskey;"
+                      disabled="true"
+                      oncommand="gForget.updateOptions();"/>
+            <label id="forgetCookiesLabel"
+                   value="&forget.cookies.label;"
+                   hidden="true"/>
           </hbox>
           <hbox>
-            <checkbox id="forgetPermissions" disabled="true"
+            <checkbox id="forgetPermissions"
                       label="&forget.permissions.label;"
-                      accesskey="&forget.permissions.accesskey;"/>
-            <label id="forgetPermissionsLabel" hidden="true"
-                   value="&forget.permissions.label;"/>
+                      accesskey="&forget.permissions.accesskey;"
+                      disabled="true"
+                      oncommand="gForget.updateOptions();"/>
+            <label id="forgetPermissionsLabel"
+                   value="&forget.permissions.label;"
+                   hidden="true"/>
           </hbox>
           <hbox>
-            <checkbox id="forgetPreferences" disabled="true"
+            <checkbox id="forgetPreferences"
                       label="&forget.preferences.label;"
-                      accesskey="&forget.preferences.accesskey;"/>
-            <label id="forgetPreferencesLabel" hidden="true"
-                   value="&forget.preferences.label;"/>
+                      accesskey="&forget.preferences.accesskey;"
+                      disabled="true"
+                      oncommand="gForget.updateOptions();"/>
+            <label id="forgetPreferencesLabel"
+                   value="&forget.preferences.label;"
+                   hidden="true"/>
           </hbox>
           <hbox>
-            <checkbox id="forgetPasswords" disabled="true"
+            <checkbox id="forgetPasswords"
                       label="&forget.passwords.label;"
-                      accesskey="&forget.passwords.accesskey;"/>
-            <label id="forgetPasswordsLabel" hidden="true"
-                   value="&forget.passwords.label;"/>
+                      accesskey="&forget.passwords.accesskey;"
+                      disabled="true"
+                      oncommand="gForget.updateOptions();"/>
+            <label id="forgetPasswordsLabel"
+                   value="&forget.passwords.label;"
+                   hidden="true"/>
           </hbox>
           <hbox>
-            <checkbox id="forgetFormdata" disabled="true" hidden="true"
+            <checkbox id="forgetFormdata"
                       label="&forget.formdata.label;"
-                      accesskey="&forget.formdata.accesskey;"/>
-            <label id="forgetFormdataLabel" hidden="true"
-                   value="&forget.formdata.label;"/>
+                      accesskey="&forget.formdata.accesskey;"
+                      disabled="true"
+                      hidden="true"
+                      oncommand="gForget.updateOptions();"/>
+            <label id="forgetFormdataLabel"
+                   value="&forget.formdata.label;"
+                   hidden="true"/>
           </hbox>
           <hbox>
-            <button id="forgetButton" disabled="true"
+            <button id="forgetButton"
                     label="&forget.button.label;"
                     accesskey="&forget.button.accesskey;"
+                    disabled="true"
                     oncommand="gForget.forget();"/>
           </hbox>
         </vbox>

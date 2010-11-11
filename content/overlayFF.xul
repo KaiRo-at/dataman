@@ -41,15 +41,18 @@
 <overlay id="datamanOverlay"
          xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul">
 
-  <commandset id="tasksCommands">
-    <command id="Tasks:DataMan" oncommand="goAbout('data');"/>
+  <script type="application/javascript"
+          src="chrome://dataman/content/overlay.js"/>
+
+  <commandset id="mainCommandSet">
+    <command id="Tools:DataMan" oncommand="toDataManager();"/>
   </commandset>
 
-  <menupopup id="taskPopup">
-    <menuitem id="tasksDataman" class="menuitem-iconic"
+  <menupopup id="menu_ToolsPopup">
+    <menuitem id="menu_openDataman" class="menuitem-iconic"
               label="&datamanCmd.label;" accesskey="&datamanCmd.accesskey;"
-              command="Tasks:DataMan"
-              insertbefore="menu_passwordManager"/>
+              command="Tools:DataMan"
+              insertafter="menu_openAddons"/>
   </menupopup>
 
 </overlay>

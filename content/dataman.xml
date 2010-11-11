@@ -46,16 +46,17 @@
           xmlns:xul="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
           xmlns:xbl="http://www.mozilla.org/xbl">
 
-  <binding id="perm-base-item" extends="chrome://global/content/bindings/richlistbox.xml#richlistitem">
+  <binding id="perm-base-item"
+           extends="chrome://global/content/bindings/richlistbox.xml#richlistitem">
     <implementation>
       <constructor><![CDATA[
-        var permLabel = document.getAnonymousElementByAttribute(this, "anonid", "permLabel");
+        var permLabel = this.type;
         try {
-          permLabel.value = gDataman.bundle.getString("perm." + this.type + ".label");
+          permLabel = gDataman.bundle.getString("perm." + this.type + ".label");
         }
         catch (e) {
-          permLabel.value = this.type;
         }
+        this.setAttribute("label", permLabel);
         this._updateRadio();
       ]]></constructor>
 
@@ -79,11 +80,13 @@
 
       <method name="_updateRadio">
         <body><![CDATA[
-          let radio = document.getAnonymousElementByAttribute(this, "anonid", "permSetting-" + this.capability);
+          let radio = document.getAnonymousElementByAttribute(this, "anonid",
+                                                              "permSetting-" + this.capability);
           if (radio)
             radio.radioGroup.selectedItem = radio;
           else {
-            let radioGroup = document.getAnonymousElementByAttribute(this, "anonid", "radioGroup");
+            let radioGroup = document.getAnonymousElementByAttribute(this, "anonid",
+                                                                     "radioGroup");
             radioGroup.selectedIndex = -1;
           }
         ]]></body>
@@ -93,10 +96,12 @@
         <parameter name="aChecked"/>
         <parameter name="aUIUpdateOnly"/>
         <body><![CDATA[
-          let checkbox = document.getAnonymousElementByAttribute(this, "anonid", "useDefault");
+          let checkbox = document.getAnonymousElementByAttribute(this, "anonid",
+                                                                 "useDefault");
           if (checkbox.checked != aChecked)
             checkbox.checked = aChecked;
-          let radioGroup = document.getAnonymousElementByAttribute(this, "anonid", "radioGroup");
+          let radioGroup = document.getAnonymousElementByAttribute(this, "anonid",
+                                                                   "radioGroup");
           radioGroup.disabled = aChecked;
           if (aChecked) {
             if (!aUIUpdateOnly)
@@ -112,22 +117,25 @@
         <parameter name="aUIUpdateOnly"/>
         <body><![CDATA[
           this.capability = aValue;
-          let radio = document.getAnonymousElementByAttribute(this, "anonid", "permSetting-" + aValue);
+          let radio = document.getAnonymousElementByAttribute(this, "anonid",
+                                                              "permSetting-" + aValue);
           if (radio && !radio.selected)
             radio.radioGroup.selectedItem = radio;
           if (!aUIUpdateOnly)
-            Services.perms.add(Services.io.newURI("http://" + this.host, null, null), this.type, aValue);
+            Services.perms.add(Services.io.newURI("http://" + this.host, null, null),
+                               this.type, aValue);
         ]]></body>
       </method>
 
     </implementation>
   </binding>
 
-  <binding id="perm-generic-item" extends="chrome://dataman/content/dataman.xml#perm-base-item">
+  <binding id="perm-generic-item"
+           extends="chrome://dataman/content/dataman.xml#perm-base-item">
     <content>
       <xul:hbox>
         <xul:label anonid="permHost" class="hostLabel" xbl:inherits="value=rawHost"/>
-        <xul:label anonid="permLabel" class="permissionLabel" control="radioGroup"/>
+        <xul:label anonid="permLabel" class="permissionLabel" xbl:inherits="value=label" control="radioGroup"/>
       </xul:hbox>
       <xul:hbox role="group" aria-labelledby="permLabel">
         <xul:checkbox class="indent" anonid="useDefault" label="&perm.UseDefault;"
@@ -143,11 +151,12 @@
     </content>
   </binding>
 
-  <binding id="perm-cookie-item" extends="chrome://dataman/content/dataman.xml#perm-base-item">
+  <binding id="perm-cookie-item"
+           extends="chrome://dataman/content/dataman.xml#perm-base-item">
     <content>
       <xul:hbox>
         <xul:label anonid="permHost" class="hostLabel" xbl:inherits="value=rawHost"/>
-        <xul:label anonid="permLabel" class="permissionLabel" control="radioGroup"/>
+        <xul:label anonid="permLabel" class="permissionLabel" xbl:inherits="value=label" control="radioGroup"/>
       </xul:hbox>
       <xul:hbox role="group" aria-labelledby="permLabel">
         <xul:checkbox class="indent" anonid="useDefault" label="&perm.UseDefault;"
@@ -165,11 +174,12 @@
     </content>
   </binding>
 
-  <binding id="perm-geo-item" extends="chrome://dataman/content/dataman.xml#perm-base-item">
+  <binding id="perm-geo-item"
+           extends="chrome://dataman/content/dataman.xml#perm-base-item">
     <content>
       <xul:hbox>
         <xul:label anonid="permHost" class="hostLabel" xbl:inherits="value=rawHost"/>
-        <xul:label anonid="permLabel" class="permissionLabel" control="radioGroup"/>
+        <xul:label anonid="permLabel" class="permissionLabel" xbl:inherits="value=label" control="radioGroup"/>
       </xul:hbox>
       <xul:hbox role="group" aria-labelledby="permLabel">
         <xul:checkbox class="indent" anonid="useDefault" label="&perm.AskAlways;"
@@ -189,7 +199,7 @@
     <content>
       <xul:hbox>
         <xul:label anonid="permHost" class="hostLabel" xbl:inherits="value=rawHost"/>
-        <xul:label anonid="permLabel" class="permissionLabel" control="radioGroup"/>
+        <xul:label anonid="permLabel" class="permissionLabel" xbl:inherits="value=label" control="radioGroup"/>
       </xul:hbox>
       <xul:hbox role="group" aria-labelledby="permLabel">
         <xul:checkbox class="indent" anonid="useDefault" hidden="true"/>
@@ -218,11 +228,13 @@
         <parameter name="aUIUpdateOnly"/>
         <body><![CDATA[
           this.capability = aValue;
-          let radio = document.getAnonymousElementByAttribute(this, "anonid", "permSetting-" + aValue);
+          let radio = document.getAnonymousElementByAttribute(this, "anonid",
+                                                              "permSetting-" + aValue);
           if (radio && !radio.selected)
             radio.radioGroup.selectedItem = radio;
           if (!aUIUpdateOnly)
-            gLocSvc.pwd.setLoginSavingEnabled(this.host, aValue == Services.perms.ALLOW_ACTION);
+            gLocSvc.pwd.setLoginSavingEnabled(this.host,
+                                              aValue == Services.perms.ALLOW_ACTION);
         ]]></body>
       </method>
     </implementation>

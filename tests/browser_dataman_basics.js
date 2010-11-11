@@ -306,7 +306,7 @@ function test_permissions_panel(aWin) {
     let perm = aWin.gPerms.list.children[i];
     switch (perm.type) {
       case "allowXULXBL":
-        is(perm.labelElement.value, "Use XUL/XBL Markup",
+        is(perm.getAttribute("label"), "Use XUL/XBL Markup",
            "Correct label for type: " + perm.type);
         is(perm.capability, 1,
            "Correct capability for: " + perm.host);
@@ -315,7 +315,7 @@ function test_permissions_panel(aWin) {
            "Set back to correct default");
         break;
       case "cookie":
-        is(perm.labelElement.value, "Set Cookies",
+        is(perm.getAttribute("label"), "Set Cookies",
            "Correct label for type: " + perm.type);
         is(perm.capability, perm.host == "cookie.getpersonas.com" ? 8 : 2,
            "Correct capability for: " + perm.host);
@@ -324,7 +324,7 @@ function test_permissions_panel(aWin) {
            "Set back to correct default");
         break;
       case "geo":
-        is(perm.labelElement.value, "Share Location",
+        is(perm.getAttribute("label"), "Share Location",
            "Correct label for type: " + perm.type);
         is(perm.capability, 1,
            "Correct capability for: " + perm.host);
@@ -333,7 +333,7 @@ function test_permissions_panel(aWin) {
            "Set back to correct default");
         break;
       case "image":
-        is(perm.labelElement.value, "Load Images",
+        is(perm.getAttribute("label"), "Load Images",
            "Correct label for type: " + perm.type);
         is(perm.capability, 2,
            "Correct capability for: " + perm.host);
@@ -342,7 +342,7 @@ function test_permissions_panel(aWin) {
            "Set back to correct default");
         break;
       case "install":
-        is(perm.labelElement.value, "Install Add-ons",
+        is(perm.getAttribute("label"), "Install Add-ons",
            "Correct label for type: " + perm.type);
         is(perm.capability, 1,
            "Correct capability for: " + perm.host);
@@ -351,7 +351,7 @@ function test_permissions_panel(aWin) {
            "Set back to correct default");
         break;
       case "password":
-        is(perm.labelElement.value, "Save Passwords",
+        is(perm.getAttribute("label"), "Save Passwords",
            "Correct label for type: " + perm.type);
         is(perm.capability, 2,
            "Correct capability for: " + perm.host);
@@ -360,7 +360,7 @@ function test_permissions_panel(aWin) {
            "Set back to correct default");
         break;
       case "popup":
-        is(perm.labelElement.value, "Open Popup Windows",
+        is(perm.getAttribute("label"), "Open Popup Windows",
            "Correct label for type: " + perm.type);
         is(perm.capability, 1,
            "Correct capability for: " + perm.host);
@@ -369,7 +369,7 @@ function test_permissions_panel(aWin) {
            "Set back to correct default");
         break;
       default:
-        is(perm.labelElement.value, perm.type,
+        is(perm.getAttribute("label"), perm.type,
            "Correct default label for type: " + perm.type);
         is(perm.capability, 2,
            "Correct capability for: " + perm.host);
@@ -435,6 +435,8 @@ function test_prefs_panel(aWin) {
 
   is(aWin.document.getElementById("forgetPreferences").disabled, false,
      "Forget preferences checkbox is enabled");
+  is(aWin.document.getElementById("forgetButton").disabled, true,
+     "Forget button is disabled");
   aWin.document.getElementById("forgetPreferences").click();
   is(aWin.document.getElementById("forgetPreferences").checked, true,
      "Forget preferences checkbox is checked");
@@ -502,8 +504,8 @@ function test_passwords_panel(aWin) {
      "Forget passwords label is hidden");
   is(aWin.document.getElementById("forgetButton").hidden, false,
      "Forget button is shown");
-  is(aWin.document.getElementById("forgetButton").disabled, false,
-     "Forget button is enabled");
+  is(aWin.document.getElementById("forgetButton").disabled, true,
+     "Forget button is disabled");
 
   aWin.gTabs.tabbox.selectedTab = aWin.document.getElementById("passwordsTab");
   is(aWin.gTabs.activePanel, "passwordsPanel",
