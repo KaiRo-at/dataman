@@ -5,7 +5,7 @@
   <Description about="urn:mozilla:install-manifest">
     <em:id>@INSTALL_EXTENSION_ID@</em:id>
     <em:version>@EXTENSION_VERSION@</em:version>
-    <em:name>Data Manager</em:name>
+    <em:name>Tahoe Data Manager</em:name>
     <em:description>Central access point to Cookies, Content Preferences, Permissions, Passwords, Form Data</em:description>
     <em:creator>Robert Kaiser</em:creator>
     <!-- Firefox -->
