@@ -72,7 +72,7 @@ XPCOMUtils.defineLazyServiceGetter(gLocSvc, "clipboard",
 var gDataman = {
   bundle: null,
   debug: false,
-  loadViewOnInit: null,
+  viewToLoad: [],
 
   initialize: function dataman_initialize() {
     try {
@@ -109,7 +109,9 @@ var gDataman = {
     // Allowed pane names:
     //   cookies, permissions, preferences, passwords, formdata
     // Invalid views fall back to the default available ones
-    this.loadViewOnInit = aView;
+    this.viewToLoad = aView.split(':');
+    if (gDomains.listLoadCompleted)
+      gDomains.loadView();
   },
 
   debugMsg: function dataman_debugMsg(aLogMessage) {
@@ -237,6 +239,7 @@ var gDomains = {
 
   ignoreSelect: false,
   ignoreUpdate: false,
+  listLoadCompleted: false,
 
   initialize: function domain_initialize() {
     gDataman.debugMsg("Start building domain list: " + Date.now()/1000);
@@ -317,28 +320,9 @@ var gDomains = {
       gDomains.search(gDomains.searchfield.value);
       yield setTimeout(nextStep, 0);
 
-      // Send a notification that we finished.
       gDataman.debugMsg("Domain list built: " + Date.now()/1000);
-      var loadDomain, loadPane;
-      if (gDataman.loadViewOnInit) {
-        [loadDomain, loadPane] = gDataman.loadViewOnInit.split(':', 2);
-        for (let i = 0; i < gDomains.displayedDomains.length; i++) {
-          if (gDomains.displayedDomains[i].title == loadDomain) {
-            gDomains.tree.view.selection.select(i);
-            break;
-          }
-        }
-      }
-      yield setTimeout(nextStep, 0);
-
-      if (loadPane) {
-        let loadTabID = loadPane + "Tab";
-        if (gTabs[loadTabID] && !gTabs[loadTabID].disabled)
-          gTabs.tabbox.selectedTab = gTabs[loadTabID];
-      }
-      yield setTimeout(nextStep, 0);
-
-      Services.obs.notifyObservers(window, "dataman-loaded", null);
+      gDomains.listLoadCompleted = true;
+      gDomains.loadView();
       yield;
     }
     loaderInstance = loader();
@@ -348,6 +332,41 @@ var gDomains = {
   shutdown: function domain_shutdown() {
     gTabs.shutdown();
     this.tree.view = null;
+  },
+
+  loadView: function domain_loadView() {
+    // load the view set in the dataman object.
+    gDataman.debugMsg("Load View: " + gDataman.viewToLoad.join(", "));
+    let loaderInstance;
+    function nextStep() {
+      loaderInstance.next();
+    }
+    function loader() {
+      if (gDataman.viewToLoad.length) {
+        gDataman.debugMsg("Domain for view found");
+        for (let i = 0; i < gDomains.displayedDomains.length; i++) {
+          if (gDomains.displayedDomains[i].title == gDataman.viewToLoad[0]) {
+            gDomains.tree.view.selection.select(i);
+            break;
+          }
+        }
+        yield setTimeout(nextStep, 0);
+
+        if (gDataman.viewToLoad.length > 1) {
+          gDataman.debugMsg("Pane for view found");
+          let loadTabID = gDataman.viewToLoad[1] + "Tab";
+          if (gTabs[loadTabID] && !gTabs[loadTabID].disabled)
+            gTabs.tabbox.selectedTab = gTabs[loadTabID];
+        }
+      }
+      yield setTimeout(nextStep, 0);
+
+      // Send a notification that we finished.
+      Services.obs.notifyObservers(window, "dataman-loaded", null);
+      yield;
+    }
+    loaderInstance = loader();
+    setTimeout(nextStep, 0);
   },
 
   _getObjID: function domain__getObjID(aIdx) {
