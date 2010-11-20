@@ -348,6 +348,7 @@ var gDomains = {
         for (let i = 0; i < gDomains.displayedDomains.length; i++) {
           if (gDomains.displayedDomains[i].title == viewdomain) {
             gDomains.tree.view.selection.select(i);
+            gDomains.tree.treeBoxObject.ensureRowIsVisible(i);
             break;
           }
         }
