@@ -5,7 +5,9 @@ dataman.jar:
 % skin    dataman  classic/1.0 %skin/classic/dataman/
 % locale  dataman  @AB_CD@ %locale/@AB_CD@/dataman/
 % overlay chrome://browser/content/browser.xul chrome://dataman/content/overlayFF.xul application={ec8030f7-c20a-464f-9b0e-13a3a9e97384}
+% overlay chrome://browser/content/pageinfo/pageInfo.xul chrome://dataman/content/overlayPI.xul application={ec8030f7-c20a-464f-9b0e-13a3a9e97384}
 % overlay chrome://communicator/content/tasksOverlay.xul chrome://dataman/content/overlaySM.xul application={92650c4d-4b8e-4d2a-b7eb-24ecf4f6b63a}
+% overlay chrome://navigator/content/pageinfo/pageInfo.xul chrome://dataman/content/overlayPI.xul application={92650c4d-4b8e-4d2a-b7eb-24ecf4f6b63a}
 % component {7a02e7fe-b32c-40ea-a790-246ca49b6061} components/aboutData.js
 % contract @mozilla.org/network/protocol/about;1?what=data {7a02e7fe-b32c-40ea-a790-246ca49b6061}
   content/dataman/dataman.css               (content/dataman.css)
@@ -15,6 +17,8 @@ dataman.jar:
   content/dataman/overlay.js                (content/overlay.js)
   content/dataman/overlayFF.xul             (content/overlayFF.xul)
   content/dataman/overlaySM.xul             (content/overlaySM.xul)
+  content/dataman/overlayPI.js              (content/overlayPI.js)
+  content/dataman/overlayPI.xul             (content/overlayPI.xul)
   skin/classic/dataman/dataman.css          (skin/classic/dataman.css)
   locale/@AB_CD@/dataman/dataman.dtd        (%chrome/dataman.dtd)
   locale/@AB_CD@/dataman/dataman.properties (%chrome/dataman.properties)
