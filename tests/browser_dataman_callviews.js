@@ -49,7 +49,7 @@ function test() {
           win.close();
           testIndex++;
           gBrowser.addTab();
-          toDataManager("getpersonas.com:permissions");
+          toDataManager("www.getpersonas.com:permissions");
         }
         else {
           Services.obs.removeObserver(testObs, DATAMAN_LOADED);

@@ -344,8 +344,9 @@ var gDomains = {
     function loader() {
       if (gDataman.viewToLoad.length) {
         gDataman.debugMsg("Domain for view found");
+        let viewdomain = gDomains.getDomainFromHost(gDataman.viewToLoad[0]);
         for (let i = 0; i < gDomains.displayedDomains.length; i++) {
-          if (gDomains.displayedDomains[i].title == gDataman.viewToLoad[0]) {
+          if (gDomains.displayedDomains[i].title == viewdomain) {
             gDomains.tree.view.selection.select(i);
             break;
           }
