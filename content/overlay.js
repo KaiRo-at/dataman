@@ -35,10 +35,17 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
+// General calling function, also overrides existing function in SeaMonkey.
 function toDataManager(aView)
 {
   switchToTabHavingURI("about:data", true, function(browser) {
     if (aView)
       browser.contentWindow.wrappedJSObject.gDataman.loadView(aView);
   });
+}
+
+// Override password manager calling function in SeaMonkey.
+function toPasswordManager()
+{
+  toDataManager(":passwords");
 }

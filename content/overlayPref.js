@@ -37,46 +37,72 @@
 
 Components.utils.import("resource://gre/modules/Services.jsm");
 
-Services.obs.addObserver(DataManagerPageInfoLoad, "page-info-dialog-loaded", false);
-window.addEventListener("unload", DataManagerPageInfoUnload, false);
+window.addEventListener("paneload", loadDatamanFFprefsOverrides, false);
 
 function toDataManager(aView) {
-  Services.wm.getMostRecentWindow("navigator:browser")
-             .switchToTabHavingURI("about:data", true, function(browser) {
+  var win = Services.wm.getMostRecentWindow("navigator:browser");
+  if (!win)
+    win = Services.ww.openWindow("_blank",
+                                 _getBrowserURL(),
+                                 null,
+                                 "chrome,all,dialog=no",
+                                 null);
+  win.switchToTabHavingURI("about:data", true, function(browser) {
     if (aView)
       browser.contentWindow.wrappedJSObject.gDataman.loadView(aView);
   });
 }
 
-function DataManagerPageInfoLoad() {
-  if (/navigator/.test(window.location)) {
-    // Services.console.logStringMessage("SeaMonkey detected");
-    var info = security._getSecurityInfo();
-    document.getElementById("security-view-cookies").disabled = !hostHasCookies(info.hostName);
-    document.getElementById("security-view-password").disabled = !realmHasPasswords(info.fullLocation);
+function _getBrowserURL() {
+  try {
+    var url = Services.prefs.getCharPref("browser.chromeURL");
+    if (url)
+      return url;
+  } catch(e) {
   }
-  else {
-    // Services.console.logStringMessage("Firefox detected");
-    var uri = gDocument.documentURIObject;
-    document.getElementById("security-view-cookies").disabled = !hostHasCookies(uri);
-    document.getElementById("security-view-password").disabled = !realmHasPasswords(uri);
+  return "chrome://browser/content/browser.xul";
+}
+
+// Firefox
+function loadDatamanFFprefsOverrides() {
+  if (!/browser/.test(window.location))
+    return;
+
+  Services.console.logStringMessage("paneload start!");
+  if ("gContentPane" in window) {
+    gContentPane.showPopupExceptions = function() {
+      toDataManager(":permissions");
+    }
+    gContentPane.showImageExceptions = function() {
+      toDataManager(":permissions");
+    }
+  }
+  if ("gPrivacyPane" in window) {
+    gPrivacyPane.showCookieExceptions = function() {
+      toDataManager(":permissions");
+    }
+    gPrivacyPane.showCookies = function() {
+      toDataManager(":cookies");
+    }
+  }
+  if ("gSecurityPane" in window) {
+    gSecurityPane.showAddonExceptions = function() {
+      toDataManager(":permissions");
+    }
+    gSecurityPane.showPasswordExceptions = function() {
+      toDataManager(":permissions");
+    }
+    gSecurityPane.showPasswords= function() {
+      toDataManager(":passwords");
+    }
   }
 }
 
-function DataManagerPageInfoUnload() {
-  Services.obs.removeObserver(DataManagerPageInfoLoad, "page-info-dialog-loaded");
+// SeaMonkey
+function openCookieViewer(viewerType) {
+  toDataManager(":cookies");
 }
 
-/**
- * Open the cookie manager window
- */
-security.viewCookies = function() {
-  toDataManager(this._getSecurityInfo().hostName + ':cookies');
-}
-
-/**
- * Open the login manager window
- */
-security.viewPasswords = function() {
-  toDataManager(this._getSecurityInfo().hostName + ':passwords');
+function showPermissionsManager(viewerType, host) {
+  toDataManager(host + ":permissions");
 }
