@@ -33,15 +33,17 @@ function test() {
         ok(true, "Step " + (testIndex + 1) + ": Data Manager is loaded");
 
         win = content.wrappedJSObject;
-        is(win.gDomains.tree.view.selection.count, 1,
-          "Step " + (testIndex + 1) + ": One domain is selected");
         if (testIndex == 0) {
+          is(win.gDomains.tree.view.selection.count, 1,
+            "Step " + (testIndex + 1) + ": One domain is selected");
           is(win.gDomains.selectedDomain.title, "example.org",
             "Step " + (testIndex + 1) + ": The correct domain is selected");
           testIndex++;
           toDataManager("getpersonas.com:cookies");
         }
         else if (testIndex == 1) {
+          is(win.gDomains.tree.view.selection.count, 1,
+            "Step " + (testIndex + 1) + ": One domain is selected");
           is(win.gDomains.selectedDomain.title, "getpersonas.com",
             "Step " + (testIndex + 1) + ": The correct domain is selected");
           is(win.gTabs.activePanel, "cookiesPanel",
@@ -51,12 +53,27 @@ function test() {
           gBrowser.addTab();
           toDataManager("www.getpersonas.com:permissions");
         }
-        else {
-          Services.obs.removeObserver(testObs, DATAMAN_LOADED);
+        else if (testIndex == 2) {
+          is(win.gDomains.tree.view.selection.count, 1,
+            "Step " + (testIndex + 1) + ": One domain is selected");
           is(win.gDomains.selectedDomain.title, "getpersonas.com",
             "Step " + (testIndex + 1) + ": The correct domain is selected");
           is(win.gTabs.activePanel, "permissionsPanel",
             "Step " + (testIndex + 1) + ": Permissions panel is selected");
+          win.close();
+          testIndex++;
+          gBrowser.addTab();
+          toDataManager(":cookies");
+        }
+        else {
+          Services.obs.removeObserver(testObs, DATAMAN_LOADED);
+          is(win.gDomains.selectfield.value, "Cookies",
+            "Step " + (testIndex + 1) + ": The correct menulist item is selected");
+          is(win.gDomains.tree.view.rowCount, 1,
+            "Step " + (testIndex + 1) + ": The correct number of domains is listed");
+          win.gDomains.tree.view.selection.select(0);
+          is(win.gDomains.selectedDomain.title, "getpersonas.com",
+            "Step " + (testIndex + 1) + ": The listed domain is correct");
           win.close();
           gLocSvc.cookie.remove("getpersonas.com", "name0", "value0", false);
           finish();
