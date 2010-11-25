@@ -26,5 +26,6 @@ dataman.jar:
   content/dataman/overlayPref.js            (content/overlayPref.js)
   content/dataman/overlayPref.xul           (content/overlayPref.xul)
   skin/classic/dataman/dataman.css          (skin/classic/dataman.css)
+  skin/classic/dataman/dmIcon-16.png        (skin/classic/dmIcon-16.png)
   locale/@AB_CD@/dataman/dataman.dtd        (%chrome/dataman.dtd)
   locale/@AB_CD@/dataman/dataman.properties (%chrome/dataman.properties)
