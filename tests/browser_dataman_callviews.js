@@ -65,8 +65,7 @@ function test() {
           gBrowser.addTab();
           toDataManager(":cookies");
         }
-        else {
-          Services.obs.removeObserver(testObs, DATAMAN_LOADED);
+        else if (testIndex == 3) {
           is(win.gDomains.selectfield.value, "Cookies",
             "Step " + (testIndex + 1) + ": The correct menulist item is selected");
           is(win.gDomains.tree.view.rowCount, 1,
@@ -74,6 +73,51 @@ function test() {
           win.gDomains.tree.view.selection.select(0);
           is(win.gDomains.selectedDomain.title, "getpersonas.com",
             "Step " + (testIndex + 1) + ": The listed domain is correct");
+          testIndex++;
+          toDataManager("www.getpersonas.com");
+        }
+        else if (testIndex == 4) {
+          is(win.gDomains.selectfield.value, "all",
+            "Step " + (testIndex + 1) + ": The correct menulist item is selected");
+          is(win.gDomains.tree.view.selection.count, 1,
+            "Step " + (testIndex + 1) + ": One domain is selected");
+          is(win.gDomains.selectedDomain.title, "getpersonas.com",
+            "Step " + (testIndex + 1) + ": The correct domain is selected");
+          win.close();
+          testIndex++;
+          gBrowser.addTab();
+          toDataManager("sub.getpersonas.com:permissions:add:popup");
+        }
+        else if (testIndex == 5) {
+          is(win.gDomains.tree.view.selection.count, 1,
+            "Step " + (testIndex + 1) + ": One domain is selected");
+          is(win.gDomains.selectedDomain.title, "getpersonas.com",
+            "Step " + (testIndex + 1) + ": The correct domain is selected");
+          is(win.gTabs.activePanel, "permissionsPanel",
+            "Step " + (testIndex + 1) + ": Permissions panel is selected");
+          is(win.gPerms.addSelBox.hidden, false,
+            "Step " + (testIndex + 1) + ": The addition box is shown");
+          is(win.gPerms.addHost.value, "sub.getpersonas.com",
+            "Step " + (testIndex + 1) + ": The correct host has been entered");
+          is(win.gPerms.addType.value, "popup",
+            "Step " + (testIndex + 1) + ": The correct permission type has been selected");
+          testIndex++;
+          toDataManager("foo.geckoisgecko.org:permissions:add:image");
+        }
+        else {
+          Services.obs.removeObserver(testObs, DATAMAN_LOADED);
+          is(win.gDomains.tree.view.selection.count, 1,
+            "Step " + (testIndex + 1) + ": One domain is selected");
+          is(win.gDomains.selectedDomain.title, "*",
+            "Step " + (testIndex + 1) + ": The correct domain is selected");
+          is(win.gTabs.activePanel, "permissionsPanel",
+            "Step " + (testIndex + 1) + ": Permissions panel is selected");
+          is(win.gPerms.addSelBox.hidden, false,
+            "Step " + (testIndex + 1) + ": The addition box is shown");
+          is(win.gPerms.addHost.value, "foo.geckoisgecko.org",
+            "Step " + (testIndex + 1) + ": The correct host has been entered");
+          is(win.gPerms.addType.value, "image",
+            "Step " + (testIndex + 1) + ": The correct permission type has been selected");
           win.close();
           gLocSvc.cookie.remove("getpersonas.com", "name0", "value0", false);
           finish();

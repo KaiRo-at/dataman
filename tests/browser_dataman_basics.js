@@ -144,8 +144,9 @@ function test_open_state(aWin) {
 },
 
 function test_fdata_panel(aWin) {
+  aWin.gTabs.tabbox.selectedTab = aWin.document.getElementById("formdataTab");
   is(aWin.gTabs.activePanel, "formdataPanel",
-     "Form data panel is selected");
+     "Form data panel is selected again");
   is(aWin.gFormdata.tree.view.rowCount, 6,
      "The correct number of form data entries is listed");
 

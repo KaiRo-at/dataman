@@ -72,7 +72,7 @@ XPCOMUtils.defineLazyServiceGetter(gLocSvc, "clipboard",
 var gDataman = {
   bundle: null,
   debug: false,
-  viewToLoad: [],
+  viewToLoad: ["*", "formdata"],
 
   initialize: function dataman_initialize() {
     try {
@@ -106,12 +106,14 @@ var gDataman = {
     // Syntax: <domain>:<pane> (:<pane> is optional)
     // Examples: example.com
     //           example.org:permissions
+    //           example.org:permissions:add:popup
     //           :cookies
     // Allowed pane names:
     //   cookies, permissions, preferences, passwords, formdata
     // Invalid views fall back to the default available ones
     // Full host names for domain are allowed
     // Empty domain with a pane specified will only list this data type
+    // Permissions allow specifying "add" and type to prefill the adding field
     this.viewToLoad = aView.split(':');
     if (gDomains.listLoadCompleted)
       gDomains.loadView();
@@ -256,6 +258,7 @@ var gDomains = {
 
     // global "domain"
     this.domainObjects["*"] = {title: "*",
+                               hasPermissions: true,
                                hasPreferences: Services.contentPrefs.getPrefs(null).enumerator.hasMoreElements(),
                                hasFormData: true};
     this.search("");
@@ -365,6 +368,12 @@ var gDomains = {
               break;
             }
           }
+          if (gDomains.selectedDomain.title != viewdomain) {
+            gDomains.tree.view.selection.select(0);
+            gDomains.tree.treeBoxObject.ensureRowIsVisible(0);
+          }
+          gDomains.selectfield.value = "all";
+          gDomains.selectType("all");
           yield setTimeout(nextStep, 0);
 
           if (gDataman.viewToLoad.length > 1) {
@@ -372,6 +381,21 @@ var gDomains = {
             let loadTabID = gDataman.viewToLoad[1] + "Tab";
             if (gTabs[loadTabID] && !gTabs[loadTabID].disabled)
               gTabs.tabbox.selectedTab = gTabs[loadTabID];
+
+            yield setTimeout(nextStep, 0);
+
+            if (gDataman.viewToLoad[1] == "permissions" &&
+                gDataman.viewToLoad[2] &&
+                gDataman.viewToLoad[2] == "add") {
+              gDataman.debugMsg("Adding permission");
+              if (gPerms.addSelBox.hidden)
+                gPerms.addButtonClick();
+              gPerms.addHost.value = gDataman.viewToLoad[0];
+              if (gDataman.viewToLoad[3])
+                gPerms.addType.value = gDataman.viewToLoad[3];
+              gPerms.addCheck();
+              gPerms.addButton.focus();
+            }
           }
         }
       }
@@ -1113,6 +1137,10 @@ var gPerms = {
   initialize: function permissions_initialize() {
     gDataman.debugMsg("Initializing permissions panel");
     this.list = document.getElementById("permList");
+    this.addSelBox = document.getElementById("permSelectionBox");
+    this.addHost = document.getElementById("permHost");
+    this.addType = document.getElementById("permType");
+    this.addButton = document.getElementById("permAddButton");
 
     let enumerator = Services.perms.enumerator;
     while (enumerator.hasMoreElements()) {
@@ -1142,6 +1170,7 @@ var gPerms = {
         this.list.appendChild(permElem);
       }
     }
+    this.list.disabled = !this.list.itemCount;
   },
 
   shutdown: function permissions_shutdown() {
@@ -1150,9 +1179,56 @@ var gPerms = {
     //      trigger the removeDomainOrFlag if not.
     while (this.list.hasChildNodes())
       this.list.removeChild(this.list.lastChild);
+
+    this.addSelBox.hidden = true;
   },
 
   // Most functions of permissions are in the XBL items!
+
+  addButtonClick: function permissions_addButtonClick() {
+    gDataman.debugMsg("Add permissions button clicked!");
+    // this.addSelBox, this.addHost, this.addType, this.addButton
+    if (this.addSelBox.hidden) {
+      // Show addition box, disable button.
+      this.addButton.disabled = true;
+      let permTypes = ["allowXULXBL", "cookie", "geo", "image", "install",
+                       "password", "popup"];
+      for (let i = 0; i < permTypes.length; i++) {
+        let typeDesc = permTypes[i];
+        try {
+          typeDesc = gDataman.bundle.getString("perm." + permTypes[i] + ".label");
+        }
+        catch (e) {
+        }
+        let menuitem = this.addType.appendItem(typeDesc, permTypes[i]);
+      }
+      this.addType.setAttribute("label",
+                                gDataman.bundle.getString("perm.type.default"));
+      this.addHost.value =
+          gDomains.selectedDomain.title == "*" ? "" : gDomains.selectedDomain.title;
+      this.addSelBox.hidden = false;
+    }
+    else {
+      // Add entry to list, hide addition box.
+      let permElem = document.createElement("richlistitem");
+      permElem.setAttribute("type", this.addType.value);
+      permElem.setAttribute("host", this.addHost.value);
+      permElem.setAttribute("rawHost", this.addHost.value.replace(/^\./, ""));
+      permElem.setAttribute("capability", this.getDefault(this.addType.value));
+      permElem.setAttribute("class", "permission");
+      this.list.appendChild(permElem);
+      this.list.disabled = false;
+      permElem.useDefault(true);
+      this.addSelBox.hidden = true;
+      this.addType.removeAllItems();
+    }
+  },
+
+  addCheck: function permissions_addCheck() {
+    // Only enable button if both fields have (reasonable) values.
+    this.addButton.disabled = !(this.addType.value &&
+                                gDomains.getDomainFromHost(this.addHost.value));
+  },
 
   getDefault: function permissions_getDefault(aType) {
     switch (aType) {
@@ -1319,6 +1395,7 @@ var gPerms = {
         gDomains.addDomainOrFlag(rawHost, "hasPermissions");
       }
     }
+    this.list.disabled = !this.list.itemCount;
   },
 
   forget: function permissions_forget() {
