@@ -107,7 +107,6 @@ function test() {
           toDataManager("foo.geckoisgecko.org:permissions:add:image");
         }
         else if (testIndex == 6) {
-          Services.obs.removeObserver(testObs, DATAMAN_LOADED);
           is(win.gDomains.tree.view.selection.count, 1,
             "Step " + (testIndex + 1) + ": One domain is selected");
           is(win.gDomains.selectedDomain.title, "*",

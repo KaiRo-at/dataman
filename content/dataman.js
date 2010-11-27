@@ -1179,6 +1179,7 @@ var gPerms = {
       }
     }
     this.list.disabled = !this.list.itemCount;
+    this.addButton.disabled = false;
   },
 
   shutdown: function permissions_shutdown() {
