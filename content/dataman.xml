@@ -135,8 +135,8 @@
           }
        ]]></body>
       </method>
-
     </implementation>
+
     <handlers>
       <handler event="keypress" phase="capturing"
                action="return this.handleKeyPress(event);"/>
