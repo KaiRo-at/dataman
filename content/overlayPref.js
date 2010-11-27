@@ -104,5 +104,8 @@ function openCookieViewer(viewerType) {
 }
 
 function showPermissionsManager(viewerType, host) {
-  toDataManager(host + ":permissions");
+  if (host)
+    toDataManager(host + ":permissions:add:" + viewerType);
+  else
+    toDataManager(":permissions");
 }
