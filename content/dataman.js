@@ -119,6 +119,14 @@ var gDataman = {
       gDomains.loadView();
   },
 
+  handleKeyPress: function dataman_handleKeyPress(aEvent) {
+    if (aEvent.keyCode == KeyEvent.DOM_VK_ESCAPE &&
+        gTabs.tabbox.selectedPanel &&
+        gTabs.tabbox.selectedPanel.id == "forgetPanel") {
+      gForget.handleKeyPress(aEvent);
+    }
+  },
+
   debugMsg: function dataman_debugMsg(aLogMessage) {
     if (this.debug)
       Services.console.logStringMessage(aLogMessage);
@@ -608,6 +616,10 @@ var gDomains = {
   handleKeyPress: function domain_handleKeyPress(aEvent) {
     if (aEvent.keyCode == KeyEvent.DOM_VK_DELETE) {
       this.forget();
+    }
+    else if (aEvent.keyCode == KeyEvent.DOM_VK_ESCAPE &&
+             gTabs.activePanel == "forgetPanel") {
+      gForget.handleKeyPress(aEvent);
     }
   },
 
@@ -2484,6 +2496,16 @@ var gForget = {
                                    this.forgetPreferences.checked ||
                                    this.forgetPasswords.checked ||
                                    this.forgetFormdata.checked);
+  },
+
+  handleKeyPress: function forget_handleKeyPress(aEvent) {
+    if (aEvent.keyCode == KeyEvent.DOM_VK_ESCAPE) {
+      // Make sure we do something that makes this panel go away.
+      if (gDomains.selectedDomain.title)
+        gDomains.select();
+      else
+        gDomains.tree.view.selection.select(0);
+    }
   },
 
   forget: function forget_forget() {
