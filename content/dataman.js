@@ -360,6 +360,8 @@ var gDomains = {
         }
         else {
           gDataman.debugMsg("Domain for view found");
+          gDomains.selectfield.value = "all";
+          gDomains.selectType("all");
           let viewdomain = gDomains.getDomainFromHost(gDataman.viewToLoad[0]);
           for (let i = 0; i < gDomains.displayedDomains.length; i++) {
             if (gDomains.displayedDomains[i].title == viewdomain) {
@@ -372,8 +374,6 @@ var gDomains = {
             gDomains.tree.view.selection.select(0);
             gDomains.tree.treeBoxObject.ensureRowIsVisible(0);
           }
-          gDomains.selectfield.value = "all";
-          gDomains.selectType("all");
           yield setTimeout(nextStep, 0);
 
           if (gDataman.viewToLoad.length > 1) {
@@ -387,6 +387,14 @@ var gDomains = {
             if (gDataman.viewToLoad[1] == "permissions" &&
                 gDataman.viewToLoad[2] &&
                 gDataman.viewToLoad[2] == "add") {
+              if (gTabs.activePanel != "permissionsPanel") {
+                // Force * domain as we have a perm panel there.
+                gDomains.tree.view.selection.select(0);
+                gDomains.tree.treeBoxObject.ensureRowIsVisible(0);
+                yield setTimeout(nextStep, 0);
+                gTabs.tabbox.selectedTab = gTabs["permissionsTab"];
+                yield setTimeout(nextStep, 0);
+              }
               gDataman.debugMsg("Adding permission");
               if (gPerms.addSelBox.hidden)
                 gPerms.addButtonClick();

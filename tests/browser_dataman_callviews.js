@@ -15,8 +15,10 @@ var gLocSvc = {
 const DATAMAN_LOADED = "dataman-loaded";
 
 function test() {
-  // Add cookie
+  // Add cookies
   gLocSvc.cookie.add("getpersonas.com", "", "name0", "value0",
+                     false, false, true, parseInt(Date.now() / 1000) + 600);
+  gLocSvc.cookie.add("drumbeat.org", "", "name1", "value1",
                      false, false, true, parseInt(Date.now() / 1000) + 600);
 
   //Services.prefs.setBoolPref("data_manager.debug", true);
@@ -68,9 +70,9 @@ function test() {
         else if (testIndex == 3) {
           is(win.gDomains.selectfield.value, "Cookies",
             "Step " + (testIndex + 1) + ": The correct menulist item is selected");
-          is(win.gDomains.tree.view.rowCount, 1,
+          is(win.gDomains.tree.view.rowCount, 2,
             "Step " + (testIndex + 1) + ": The correct number of domains is listed");
-          win.gDomains.tree.view.selection.select(0);
+          win.gDomains.tree.view.selection.select(1);
           is(win.gDomains.selectedDomain.title, "getpersonas.com",
             "Step " + (testIndex + 1) + ": The listed domain is correct");
           testIndex++;
@@ -104,7 +106,7 @@ function test() {
           testIndex++;
           toDataManager("foo.geckoisgecko.org:permissions:add:image");
         }
-        else {
+        else if (testIndex == 6) {
           Services.obs.removeObserver(testObs, DATAMAN_LOADED);
           is(win.gDomains.tree.view.selection.count, 1,
             "Step " + (testIndex + 1) + ": One domain is selected");
@@ -118,8 +120,26 @@ function test() {
             "Step " + (testIndex + 1) + ": The correct host has been entered");
           is(win.gPerms.addType.value, "image",
             "Step " + (testIndex + 1) + ": The correct permission type has been selected");
+          testIndex++;
+          toDataManager("drumbeat.org:permissions:add:cookie");
+        }
+        else {
+          Services.obs.removeObserver(testObs, DATAMAN_LOADED);
+          is(win.gDomains.tree.view.selection.count, 1,
+            "Step " + (testIndex + 1) + ": One domain is selected");
+          is(win.gDomains.selectedDomain.title, "*",
+            "Step " + (testIndex + 1) + ": The correct domain is selected");
+          is(win.gTabs.activePanel, "permissionsPanel",
+            "Step " + (testIndex + 1) + ": Permissions panel is selected");
+          is(win.gPerms.addSelBox.hidden, false,
+            "Step " + (testIndex + 1) + ": The addition box is shown");
+          is(win.gPerms.addHost.value, "drumbeat.org",
+            "Step " + (testIndex + 1) + ": The correct host has been entered");
+          is(win.gPerms.addType.value, "cookie",
+            "Step " + (testIndex + 1) + ": The correct permission type has been selected");
           win.close();
           gLocSvc.cookie.remove("getpersonas.com", "name0", "value0", false);
+          gLocSvc.cookie.remove("drumbeat.org", "name1", "value1", false);
           finish();
         }
       }
