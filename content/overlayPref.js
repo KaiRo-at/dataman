@@ -71,41 +71,41 @@ function loadDatamanFFprefsOverrides() {
   Services.console.logStringMessage("paneload start!");
   if ("gContentPane" in window) {
     gContentPane.showPopupExceptions = function() {
-      toDataManager(":permissions");
+      toDataManager("|permissions");
     }
     gContentPane.showImageExceptions = function() {
-      toDataManager(":permissions");
+      toDataManager("|permissions");
     }
   }
   if ("gPrivacyPane" in window) {
     gPrivacyPane.showCookieExceptions = function() {
-      toDataManager(":permissions");
+      toDataManager("|permissions");
     }
     gPrivacyPane.showCookies = function() {
-      toDataManager(":cookies");
+      toDataManager("|cookies");
     }
   }
   if ("gSecurityPane" in window) {
     gSecurityPane.showAddonExceptions = function() {
-      toDataManager(":permissions");
+      toDataManager("|permissions");
     }
     gSecurityPane.showPasswordExceptions = function() {
-      toDataManager(":permissions");
+      toDataManager("|permissions");
     }
     gSecurityPane.showPasswords= function() {
-      toDataManager(":passwords");
+      toDataManager("|passwords");
     }
   }
 }
 
 // SeaMonkey
 function openCookieViewer(viewerType) {
-  toDataManager(":cookies");
+  toDataManager("|cookies");
 }
 
 function showPermissionsManager(viewerType, host) {
   if (host)
-    toDataManager(host + ":permissions:add:" + viewerType);
+    toDataManager(host + "|permissions|add|" + viewerType);
   else
-    toDataManager(":permissions");
+    toDataManager("|permissions");
 }

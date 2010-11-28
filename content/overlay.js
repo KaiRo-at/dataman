@@ -47,5 +47,5 @@ function toDataManager(aView)
 // Override password manager calling function in SeaMonkey.
 function toPasswordManager()
 {
-  toDataManager(":passwords");
+  toDataManager("|passwords");
 }

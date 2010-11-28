@@ -41,7 +41,7 @@ function test() {
           is(win.gDomains.selectedDomain.title, "example.org",
             "Step " + (testIndex + 1) + ": The correct domain is selected");
           testIndex++;
-          toDataManager("getpersonas.com:cookies");
+          toDataManager("getpersonas.com|cookies");
         }
         else if (testIndex == 1) {
           is(win.gDomains.tree.view.selection.count, 1,
@@ -53,7 +53,7 @@ function test() {
           win.close();
           testIndex++;
           gBrowser.addTab();
-          toDataManager("www.getpersonas.com:permissions");
+          toDataManager("www.getpersonas.com:443|permissions");
         }
         else if (testIndex == 2) {
           is(win.gDomains.tree.view.selection.count, 1,
@@ -65,7 +65,7 @@ function test() {
           win.close();
           testIndex++;
           gBrowser.addTab();
-          toDataManager(":cookies");
+          toDataManager("|cookies");
         }
         else if (testIndex == 3) {
           is(win.gDomains.selectfield.value, "Cookies",
@@ -88,7 +88,7 @@ function test() {
           win.close();
           testIndex++;
           gBrowser.addTab();
-          toDataManager("sub.getpersonas.com:permissions:add:popup");
+          toDataManager("sub.getpersonas.com:8888|permissions|add|popup");
         }
         else if (testIndex == 5) {
           is(win.gDomains.tree.view.selection.count, 1,
@@ -99,12 +99,12 @@ function test() {
             "Step " + (testIndex + 1) + ": Permissions panel is selected");
           is(win.gPerms.addSelBox.hidden, false,
             "Step " + (testIndex + 1) + ": The addition box is shown");
-          is(win.gPerms.addHost.value, "sub.getpersonas.com",
-            "Step " + (testIndex + 1) + ": The correct host has been entered");
+          is(win.gPerms.addHost.value, "sub.getpersonas.com:8888",
+            "Step " + (testIndex + 1) + ": The correct host and port has been entered");
           is(win.gPerms.addType.value, "popup",
             "Step " + (testIndex + 1) + ": The correct permission type has been selected");
           testIndex++;
-          toDataManager("foo.geckoisgecko.org:permissions:add:image");
+          toDataManager("foo.geckoisgecko.org|permissions|add|image");
         }
         else if (testIndex == 6) {
           is(win.gDomains.tree.view.selection.count, 1,
@@ -120,7 +120,7 @@ function test() {
           is(win.gPerms.addType.value, "image",
             "Step " + (testIndex + 1) + ": The correct permission type has been selected");
           testIndex++;
-          toDataManager("drumbeat.org:permissions:add:cookie");
+          toDataManager("drumbeat.org|permissions|add|cookie");
         }
         else {
           Services.obs.removeObserver(testObs, DATAMAN_LOADED);

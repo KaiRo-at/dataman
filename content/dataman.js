@@ -103,18 +103,18 @@ var gDataman = {
 
   loadView: function dataman_loadView(aView) {
     // Set variable, used in initizalization routine.
-    // Syntax: <domain>:<pane> (:<pane> is optional)
+    // Syntax: <domain>|<pane> (|<pane> is optional)
     // Examples: example.com
-    //           example.org:permissions
-    //           example.org:permissions:add:popup
-    //           :cookies
+    //           example.org|permissions
+    //           example.org:8888|permissions|add|popup
+    //           |cookies
     // Allowed pane names:
     //   cookies, permissions, preferences, passwords, formdata
     // Invalid views fall back to the default available ones
-    // Full host names for domain are allowed
+    // Full host names (even including ports) for domain are allowed
     // Empty domain with a pane specified will only list this data type
     // Permissions allow specifying "add" and type to prefill the adding field
-    this.viewToLoad = aView.split(':');
+    this.viewToLoad = aView.split('|');
     if (gDomains.listLoadCompleted)
       gDomains.loadView();
   },
@@ -370,7 +370,11 @@ var gDomains = {
           gDataman.debugMsg("Domain for view found");
           gDomains.selectfield.value = "all";
           gDomains.selectType("all");
-          let viewdomain = gDomains.getDomainFromHost(gDataman.viewToLoad[0]);
+          let host = gDataman.viewToLoad[0];
+          // Might have a host:port case, fake a scheme when none present.
+          if (!/:\//.test(host))
+            host = "foo://" + host;
+          let viewdomain = gDomains.getDomainFromHost(host);
           for (let i = 0; i < gDomains.displayedDomains.length; i++) {
             if (gDomains.displayedDomains[i].title == viewdomain) {
               gDomains.tree.view.selection.select(i);

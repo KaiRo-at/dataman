@@ -42,7 +42,7 @@ function AboutData() { }
 AboutData.prototype = {
   classDescription: "about:data",
   contractID: "@mozilla.org/network/protocol/about;1?what=data",
-  classID: Components.ID("{7a02e7fe-b32c-40ea-a790-246ca49b6061}"),
+  classID: Components.ID("{16b2ea73-0a14-4b7e-a5da-fdd883bc73a5}"),
   QueryInterface: XPCOMUtils.generateQI([Components.interfaces.nsIAboutModule]),
 
   getURIFlags: function(aURI) {

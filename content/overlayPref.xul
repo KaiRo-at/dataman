@@ -53,7 +53,7 @@
             src="chrome://dataman/content/overlayPref.js"/>
   </window>
 
-  <button id="viewStoredPassword" oncommand="toDataManager(':passwords');"/>
+  <button id="viewStoredPassword" oncommand="toDataManager('|passwords');"/>
 
   <overlay id="cookiesNavigatorOverlay">
     <script type="application/javascript"

@@ -71,12 +71,12 @@ function DataManagerPageInfoUnload() {
  * Open the cookie manager window
  */
 security.viewCookies = function() {
-  toDataManager(this._getSecurityInfo().hostName + ':cookies');
+  toDataManager(this._getSecurityInfo().hostName + '|cookies');
 }
 
 /**
  * Open the login manager window
  */
 security.viewPasswords = function() {
-  toDataManager(this._getSecurityInfo().hostName + ':passwords');
+  toDataManager(this._getSecurityInfo().hostName + '|passwords');
 }
