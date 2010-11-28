@@ -67,6 +67,9 @@ XPCOMUtils.defineLazyServiceGetter(gLocSvc, "url",
 XPCOMUtils.defineLazyServiceGetter(gLocSvc, "clipboard",
                                    "@mozilla.org/widget/clipboardhelper;1",
                                    "nsIClipboardHelper");
+XPCOMUtils.defineLazyServiceGetter(gLocSvc, "idn",
+                                   "@mozilla.org/network/idn-service;1",
+                                   "nsIIDNService");
 
 // :::::::::::::::::::: general functions ::::::::::::::::::::
 var gDataman = {
@@ -266,6 +269,7 @@ var gDomains = {
 
     // global "domain"
     this.domainObjects["*"] = {title: "*",
+                               displayTitle: "*",
                                hasPermissions: true,
                                hasPreferences: Services.contentPrefs.getPrefs(null).enumerator.hasMoreElements(),
                                hasFormData: true};
@@ -474,6 +478,10 @@ var gDomains = {
     let domain = this.getDomainFromHost(aHostname);
     if (!this.domainObjects[domain]) {
       this.domainObjects[domain] = {title: domain};
+      if (/xn--/.test(domain))
+        this.domainObjects[domain].displayTitle = gLocSvc.idn.convertToDisplayIDN(domain, {});
+      else
+        this.domainObjects[domain].displayTitle = this.domainObjects[domain].title;
       this.domainObjects[domain][aFlag] = true;
       gDataman.debugMsg("added domain: " + domain + " (with flag " + aFlag + ")");
       if (!this.ignoreUpdate)
@@ -633,7 +641,7 @@ var gDomains = {
 
     // compare function for two domain items
     let compfunc = function domain_sort_compare(aOne, aTwo) {
-      return aOne.title.localeCompare(aTwo.title);
+      return aOne.displayTitle.localeCompare(aTwo.displayTitle);
     };
 
     // Do the actual sorting of the array.
@@ -696,7 +704,7 @@ var gDomains = {
   getCellText: function(aRow, aColumn) {
     switch (aColumn.id) {
       case "domainCol":
-        return this.displayedDomains[aRow].title;
+        return this.displayedDomains[aRow].displayTitle;
     }
   },
 };
@@ -842,6 +850,7 @@ var gCookies = {
               isDomain: aCookie.isDomain,
               host: aCookie.host,
               rawHost: aCookie.rawHost,
+              displayHost: gLocSvc.idn.convertToDisplayIDN(aCookie.rawHost, {}),
               path: aCookie.path,
               isSecure: aCookie.isSecure,
               isSession: aCookie.isSession,
@@ -958,7 +967,7 @@ var gCookies = {
     let compfunc = function formdata_sort_compare(aOne, aTwo) {
       switch (column.id) {
         case "cookieHostCol":
-          return dirFactor * aOne.rawHost.localeCompare(aTwo.rawHost);
+          return dirFactor * aOne.displayHost.localeCompare(aTwo.displayHost);
         case "cookieNameCol":
           return dirFactor * aOne.name.localeCompare(aTwo.name);
         case "cookieExpiresCol":
@@ -1145,7 +1154,7 @@ var gCookies = {
     let cookie = this.displayedCookies[aRow];
     switch (aColumn.id) {
       case "cookieHostCol":
-        return cookie.rawHost;
+        return cookie.displayHost;
       case "cookieNameCol":
         return cookie.name;
       case "cookieExpiresCol":
@@ -1176,6 +1185,8 @@ var gPerms = {
         permElem.setAttribute("type", nextPermission.type);
         permElem.setAttribute("host", nextPermission.host);
         permElem.setAttribute("rawHost", rawHost);
+        permElem.setAttribute("displayHost",
+                              gLocSvc.idn.convertToDisplayIDN(rawHost, {}));
         permElem.setAttribute("capability", nextPermission.capability);
         permElem.setAttribute("class", "permission");
         this.list.appendChild(permElem);
@@ -1186,9 +1197,12 @@ var gPerms = {
     for (let i = 0; i < rejectHosts.length; i++) {
       if (gDomains.hostMatchesSelected(rejectHosts[i])) {
         let permElem = document.createElement("richlistitem");
+        let rawHost = gDomains.getDomainFromHost(rejectHosts[i]);
         permElem.setAttribute("type", "password");
         permElem.setAttribute("host", rejectHosts[i]);
-        permElem.setAttribute("rawHost", gDomains.getDomainFromHost(rejectHosts[i]));
+        permElem.setAttribute("rawHost", rawHost);
+        permElem.setAttribute("displayHost",
+                              gLocSvc.idn.convertToDisplayIDN(rawHost, {}));
         permElem.setAttribute("capability", Services.perms.DENY_ACTION);
         permElem.setAttribute("class", "permission");
         this.list.appendChild(permElem);
@@ -1474,16 +1488,25 @@ var gPrefs = {
     }
     else {
       try {
-        let sql = "SELECT groups.name AS host FROM groups WHERE host = :hostName OR host LIKE :hostMatch ESCAPE '/'";
+        let sql = "SELECT groups.name AS host FROM groups " +
+                  "WHERE host = :hostName OR host = :hostIDNName OR " +
+                         "host LIKE :hostMatch OR host LIKE :hostIDNMatch " +
+                  "ESCAPE '/'";
         var statement = Services.contentPrefs.DBConnection.createStatement(sql);
+        let idnDomain = gLocSvc.idn.convertToDisplayIDN(domain, {});
         statement.params.hostName = domain;
+        statement.params.hostIDNName = idnDomain;
         statement.params.hostMatch = "%." + statement.escapeStringForLIKE(domain, "/");
+        statement.params.hostIDNMatch = "%." + statement.escapeStringForLIKE(idnDomain, "/");
         while (statement.executeStep()) {
           // Now, get all prefs for that host.
           let enumerator =  Services.contentPrefs.getPrefs(statement.row["host"]).enumerator;
           while (enumerator.hasMoreElements()) {
             let pref = enumerator.getNext().QueryInterface(Components.interfaces.nsIProperty);
-            this.prefs.push({host: statement.row["host"], name: pref.name, value: pref.value});
+            this.prefs.push({host: statement.row["host"],
+                             displayHost: gLocSvc.idn.convertToDisplayIDN(statement.row["host"], {}),
+                             name: pref.name,
+                             value: pref.value});
           }
         }
       }
@@ -1555,7 +1578,7 @@ var gPrefs = {
     let compfunc = function prefs_sort_compare(aOne, aTwo) {
       switch (column.id) {
         case "prefsHostCol":
-          return dirFactor * aOne.host.localeCompare(aTwo.host);
+          return dirFactor * aOne.displayHost.localeCompare(aTwo.displayHost);
         case "prefsNameCol":
           return dirFactor * aOne.name.localeCompare(aTwo.name);
         case "prefsValueCol":
@@ -1668,6 +1691,8 @@ var gPrefs = {
       if (!domainPrefs)
         gDomains.removeDomainOrFlag(domain, "hasPreferences");
     }
+    if (aData == "prefSet")
+        aSubject.displayHost = gLocSvc.idn.convertToDisplayIDN(aSubject.host, {});
     if (idx >= 0) {
       if (aData == "prefSet") {
         this.prefs[idx] = aSubject;
@@ -1741,7 +1766,7 @@ var gPrefs = {
     let cpref = this.prefs[aRow];
     switch (aColumn.id) {
       case "prefsHostCol":
-        return cpref.host || "*";
+        return cpref.displayHost || "*";
       case "prefsNameCol":
         return cpref.name;
       case "prefsValueCol":
