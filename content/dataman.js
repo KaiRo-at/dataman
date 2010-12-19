@@ -84,6 +84,15 @@ var gDataman = {
     catch (e) {}
     this.bundle = document.getElementById("datamanBundle");
 
+    // Add ourselves to the whitelist for disabling browser chrome.
+    var win = Services.wm.getMostRecentWindow("navigator:browser");
+    if (win && win.XULBrowserWindow && win.XULBrowserWindow.inContentWhitelist &&
+        !win.XULBrowserWindow.inContentWhitelist.some(function(aSpec) {
+           return aSpec == location;
+         })) {
+      win.XULBrowserWindow.inContentWhitelist.push(location.href);
+    }
+
     Services.obs.addObserver(this, "cookie-changed", false);
     Services.obs.addObserver(this, "perm-changed", false);
     Services.obs.addObserver(this, "passwordmgr-storage-changed", false);
@@ -120,6 +129,7 @@ var gDataman = {
     this.viewToLoad = aView.split('|');
     if (gDomains.listLoadCompleted)
       gDomains.loadView();
+    // Else will call this at the end of loading the list.
   },
 
   handleKeyPress: function dataman_handleKeyPress(aEvent) {
@@ -274,7 +284,7 @@ var gDomains = {
                                hasPreferences: Services.contentPrefs.getPrefs(null).enumerator.hasMoreElements(),
                                hasFormData: true};
     this.search("");
-    if (!gDataman.loadViewOnInit)
+    if (!gDataman.viewToLoad.length)
       this.tree.view.selection.select(0);
 
     let loaderInstance;
@@ -355,7 +365,7 @@ var gDomains = {
   },
 
   loadView: function domain_loadView() {
-    // load the view set in the dataman object.
+    // Load the view set in the dataman object.
     gDataman.debugMsg("Load View: " + gDataman.viewToLoad.join(", "));
     let loaderInstance;
     function nextStep() {
@@ -369,6 +379,19 @@ var gDomains = {
                       gDataman.viewToLoad[1].substr(1);
           gDomains.selectfield.value = sType;
           gDomains.selectType(sType);
+          yield setTimeout(nextStep, 0);
+
+          if (gDomains.tree.view.rowCount) {
+            // Select first domain and panel fitting selected type.
+            gDomains.tree.view.selection.select(0);
+            gDomains.tree.treeBoxObject.ensureRowIsVisible(0);
+            yield setTimeout(nextStep, 0);
+
+            // This should always exist and be enabled, but play safe.
+            let loadTabID = gDataman.viewToLoad[1] + "Tab";
+            if (gTabs[loadTabID] && !gTabs[loadTabID].disabled)
+              gTabs.tabbox.selectedTab = gTabs[loadTabID];
+          }
         }
         else {
           gDataman.debugMsg("Domain for view found");
@@ -379,16 +402,25 @@ var gDomains = {
           if (!/:\//.test(host))
             host = "foo://" + host;
           let viewdomain = gDomains.getDomainFromHost(host);
+          let selectIdx = 0; // tree index to be selected
           for (let i = 0; i < gDomains.displayedDomains.length; i++) {
             if (gDomains.displayedDomains[i].title == viewdomain) {
-              gDomains.tree.view.selection.select(i);
-              gDomains.tree.treeBoxObject.ensureRowIsVisible(i);
+              selectIdx = i;
               break;
             }
           }
-          if (gDomains.selectedDomain.title != viewdomain) {
-            gDomains.tree.view.selection.select(0);
-            gDomains.tree.treeBoxObject.ensureRowIsVisible(0);
+          let permAdd = (gDataman.viewToLoad[1] &&
+                         gDataman.viewToLoad[1] == "permissions" &&
+                         gDataman.viewToLoad[2] &&
+                         gDataman.viewToLoad[2] == "add");
+          if (permAdd && selectIdx != 0 &&
+              (!(viewdomain in gDomains.domainObjects) ||
+               !gDomains.domainObjects[viewdomain].hasPermissions)) {
+            selectIdx = 0; // Force * domain as we have a perm panel there.
+          }
+          if (gDomains.tree.currentIndex != selectIdx) {
+            gDomains.tree.view.selection.select(selectIdx);
+            gDomains.tree.treeBoxObject.ensureRowIsVisible(selectIdx);
           }
           yield setTimeout(nextStep, 0);
 
@@ -400,17 +432,7 @@ var gDomains = {
 
             yield setTimeout(nextStep, 0);
 
-            if (gDataman.viewToLoad[1] == "permissions" &&
-                gDataman.viewToLoad[2] &&
-                gDataman.viewToLoad[2] == "add") {
-              if (gTabs.activePanel != "permissionsPanel") {
-                // Force * domain as we have a perm panel there.
-                gDomains.tree.view.selection.select(0);
-                gDomains.tree.treeBoxObject.ensureRowIsVisible(0);
-                yield setTimeout(nextStep, 0);
-                gTabs.tabbox.selectedTab = gTabs["permissionsTab"];
-                yield setTimeout(nextStep, 0);
-              }
+            if (permAdd) {
               gDataman.debugMsg("Adding permission");
               if (gPerms.addSelBox.hidden)
                 gPerms.addButtonClick();
@@ -425,7 +447,7 @@ var gDomains = {
       }
       yield setTimeout(nextStep, 0);
 
-      // Send a notification that we finished.
+      // Send a notification that we have finished.
       Services.obs.notifyObservers(window, "dataman-loaded", null);
       yield;
     }
@@ -1230,6 +1252,7 @@ var gPerms = {
     if (this.addSelBox.hidden) {
       // Show addition box, disable button.
       this.addButton.disabled = true;
+      this.addType.removeAllItems(); // Make sure list is clean.
       let permTypes = ["allowXULXBL", "cookie", "geo", "image", "install",
                        "password", "popup"];
       for (let i = 0; i < permTypes.length; i++) {

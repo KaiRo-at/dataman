@@ -2,11 +2,11 @@
  * http://creativecommons.org/publicdomain/zero/1.0/
  */
 
-// Test basic functionality of the data manager
+// Test basic functionality of the data manager.
 
 Components.utils.import("resource://gre/modules/Services.jsm");
 
-// happen to match what's used in Data Manager itself
+// Happens to match what's used in Data Manager itself.
 var gLocSvc = {
   cookie: Components.classes["@mozilla.org/cookiemanager;1"]
                     .getService(Components.interfaces.nsICookieManager2),
@@ -16,7 +16,7 @@ var gLocSvc = {
                  .getService(Components.interfaces.nsILoginManager),
   idn: Components.classes["@mozilla.org/network/idn-service;1"]
                  .getService(Components.interfaces.nsIIDNService),
-}
+};
 
 const DATAMAN_LOADED = "dataman-loaded";
 const TEST_DONE = "dataman-test-done";
