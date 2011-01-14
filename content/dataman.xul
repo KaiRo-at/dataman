@@ -51,6 +51,7 @@
 <page xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
       xmlns:xhtml="http://www.w3.org/1999/xhtml"
       id="dataman-page" title="&dataman.windowTitle;"
+      disablefastfind="true"
       onload="gDataman.initialize();"
       onunload="gDataman.shutdown();"
       onkeypress="gDataman.handleKeyPress(event);">
