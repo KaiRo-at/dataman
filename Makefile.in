@@ -70,3 +70,14 @@ DEFINES += -DAB_CD=en-US \
            -DEXTENSION_VERSION=$(EXTENSION_VERSION)
 
 include $(topsrcdir)/config/rules.mk
+
+ifdef MOZ_OMNIJAR
+ABS_DIST = $(call core_abspath,$(DIST)/bin)
+
+libs::
+	@echo "Packaging $(INSTALL_EXTENSION_ID).xpi"
+	if test -d "$(ABS_DIST)/extensions/$(INSTALL_EXTENSION_ID)"; then \
+	cd $(ABS_DIST)/extensions/$(INSTALL_EXTENSION_ID)/; $(ZIP) -r9mX ../$(INSTALL_EXTENSION_ID).xpi *; \
+	rm -rf $(ABS_DIST)/extensions/$(INSTALL_EXTENSION_ID); \
+	fi
+endif
