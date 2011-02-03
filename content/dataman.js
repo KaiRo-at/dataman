@@ -37,6 +37,8 @@
 
 Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
 Components.utils.import("resource://gre/modules/Services.jsm");
+// Load DownloadUtils module for convertByteUnits
+Components.utils.import("resource://gre/modules/DownloadUtils.jsm");
 
 // make this available in older versions, newer ones (2.0b3pre) have it already
 if (!("contentPrefs" in Services))
@@ -70,6 +72,15 @@ XPCOMUtils.defineLazyServiceGetter(gLocSvc, "clipboard",
 XPCOMUtils.defineLazyServiceGetter(gLocSvc, "idn",
                                    "@mozilla.org/network/idn-service;1",
                                    "nsIIDNService");
+XPCOMUtils.defineLazyServiceGetter(gLocSvc, "appcache",
+                                   "@mozilla.org/network/application-cache-service;1",
+                                   "nsIApplicationCacheService");
+XPCOMUtils.defineLazyServiceGetter(gLocSvc, "domstoremgr",
+                                   "@mozilla.org/dom/storagemanager;1",
+                                   "nsIDOMStorageManager");
+XPCOMUtils.defineLazyServiceGetter(gLocSvc, "idxdbmgr",
+                                   "@mozilla.org/dom/indexeddb/manager;1",
+                                   "nsIIndexedDatabaseManager");
 
 // :::::::::::::::::::: general functions ::::::::::::::::::::
 var gDataman = {
@@ -350,6 +361,15 @@ var gDomains = {
       gDomains.search(gDomains.searchfield.value);
       yield setTimeout(nextStep, 0);
 
+      // Add domains for web storages.
+      gDataman.debugMsg("Add storages to domain list: " + Date.now()/1000);
+      gStorage.loadList();
+      for (let i = 0; i < gStorage.storages.length; i++) {
+        gDomains.addDomainOrFlag(gStorage.storages[i].rawHost, "hasStorage");
+      }
+      gDomains.search(gDomains.searchfield.value);
+      yield setTimeout(nextStep, 0);
+
       gDataman.debugMsg("Domain list built: " + Date.now()/1000);
       gDomains.listLoadCompleted = true;
       gDomains.loadView();
@@ -531,6 +551,7 @@ var gDomains = {
         !this.domainObjects[aDomain].hasPermissions &&
         !this.domainObjects[aDomain].hasPreferences &&
         !this.domainObjects[aDomain].hasPasswords &&
+        !this.domainObjects[aDomain].hasStorage &&
         !this.domainObjects[aDomain].hasFormData) {
       gDataman.debugMsg("removed domain: " + aDomain);
       // Get index in display tree.
@@ -576,6 +597,7 @@ var gDomains = {
           !this.domainObjects[domain].hasPermissions &&
           !this.domainObjects[domain].hasPreferences &&
           !this.domainObjects[domain].hasPasswords &&
+          !this.domainObjects[domain].hasStorage &&
           !this.domainObjects[domain].hasFormData) {
         delete this.domainObjects[domain];
       }
@@ -602,6 +624,7 @@ var gDomains = {
       gTabs.permissionsTab.disabled = true;
       gTabs.preferencesTab.disabled = true;
       gTabs.passwordsTab.disabled = true;
+      gTabs.storageTab.disabled = true;
       gTabs.formdataTab.hidden = true;
       gTabs.formdataTab.disabled = true;
       gTabs.forgetTab.hidden = true;
@@ -624,6 +647,7 @@ var gDomains = {
     gTabs.permissionsTab.disabled = !this.selectedDomain.hasPermissions;
     gTabs.preferencesTab.disabled = !this.selectedDomain.hasPreferences;
     gTabs.passwordsTab.disabled = !this.selectedDomain.hasPasswords;
+    gTabs.storageTab.disabled = !this.selectedDomain.hasStorage;
     gTabs.formdataTab.hidden = !this.selectedDomain.hasFormData;
     gTabs.formdataTab.disabled = !this.selectedDomain.hasFormData;
     gTabs.forgetTab.disabled = true;
@@ -740,6 +764,7 @@ var gTabs = {
   permissionsTab: null,
   preferencesTab: null,
   passwordsTab: null,
+  storageTab: null,
   formdataTab: null,
   forgetTab: null,
 
@@ -753,6 +778,7 @@ var gTabs = {
     this.permissionsTab = document.getElementById("permissionsTab");
     this.preferencesTab = document.getElementById("preferencesTab");
     this.passwordsTab = document.getElementById("passwordsTab");
+    this.storageTab = document.getElementById("storageTab");
     this.formdataTab = document.getElementById("formdataTab");
     this.forgetTab = document.getElementById("forgetTab");
 
@@ -761,6 +787,7 @@ var gTabs = {
       permissionsPanel: gPerms,
       preferencesPanel: gPrefs,
       passwordsPanel: gPasswords,
+      storagePanel: gStorage,
       formdataPanel: gFormdata,
       forgetPanel: gForget
     };
@@ -2152,6 +2179,284 @@ var gPasswords = {
         return signon.username || "";
       case "pwdPasswordCol":
         return signon.password || "";
+    }
+  },
+};
+
+// :::::::::::::::::::: web storage panel ::::::::::::::::::::
+var gStorage = {
+  tree: null,
+  removeButton: null,
+
+  storages: [],
+  displayedStorages: [],
+
+  initialize: function storage_initialize() {
+    gDataman.debugMsg("Initializing storage panel");
+    this.tree = document.getElementById("storageTree");
+    this.tree.view = this;
+
+    this.removeButton = document.getElementById("storageRemove");
+
+    this.tree.treeBoxObject.beginUpdateBatch();
+    // this.loadList() is being called in gDomains.initialize() already
+    this.displayedStorages = this.storages.filter(
+      function (aStorage) {
+        return gDomains.hostMatchesSelected(aStorage.rawHost);
+      });
+    this.sort(null, false, false);
+    this.tree.treeBoxObject.endUpdateBatch();
+  },
+
+  shutdown: function storage_shutdown() {
+    gDataman.debugMsg("Shutting down storage panel");
+    this.tree.view.selection.clearSelection();
+    this.tree.view = null;
+    this.displayedStorages = [];
+  },
+
+  loadList: function storage_loadList() {
+    // Load appCache entries.
+    let groups = gLocSvc.appcache.getGroups();
+    gDataman.debugMsg("Loading " + groups.length + " appcache entries");
+    for (let i = 0; i < groups.length; i++) {
+      let uri = Services.io.newURI(groups[i], null, null);
+      let cache = gLocSvc.appcache.getActiveCache(groups[i]);
+      this.storages.push({host: uri.host,
+                          rawHost: uri.host,
+                          type: "appCache",
+                          size: cache.usage,
+                          groupID: groups[i]});
+    }
+
+    // Load DOM storage entries, unfortunately need to go to the DB. :(
+    // Bug 343163 would make this easier and clean.
+    let domstorelist = [];
+    let file = Components.classes["@mozilla.org/file/directory_service;1"]
+                         .getService(Components.interfaces.nsIProperties)
+                         .get("ProfD", Components.interfaces.nsIFile);
+    file.append("webappsstore.sqlite");
+    if (file.exists()) {
+      var connection = Components.classes["@mozilla.org/storage/service;1"]
+                                 .getService(Components.interfaces.mozIStorageService)
+                                 .openDatabase(file);
+      try {
+        if (connection.tableExists("webappsstore2")) {
+          var statement = connection.createStatement("SELECT scope, key FROM webappsstore2");
+          while (statement.executeStep())
+            domstorelist.push({scope: statement.getString(0),
+                               key: statement.getString(1)});
+          statement.reset();
+          statement.finalize();
+        }
+      } finally {
+        connection.close();
+      }
+    }
+    gDataman.debugMsg("Loading " + domstorelist.length + " DOM Storage entries");
+    // Scopes are reversed, e.g. |moc.elgoog.www.:http:80| (localStore) or |gro.allizom.| (globalStore).
+    for (let i = 0; i < domstorelist.length; i++) {
+      // Get the host from the reversed scope.
+      let scopeparts = domstorelist[i].scope.split(":");
+      let host = "", type = "globalStore";
+      for (let c = 0; c < scopeparts[0].length; c++) {
+        host = scopeparts[0].charAt(c) + host;
+      }
+      let rawHost = host.replace(/^\./, "");
+      if (scopeparts.length > 1) {
+        // This is a localStore, [1] is protocol, [3] is port.
+        type = "localStore";
+        host = scopeparts[1] + "://" + host;
+        // Add port if it's not the default for this protocol.
+        if (!((scopeparts[1] == "http" && scopeparts[2] == 80) ||
+              (scopeparts[1] == "https" && scopeparts[2] == 443))) {
+          host = host + ":" + scopeparts[2];
+        }
+      }
+      // Merge entries for one scope into a single entry if possible.
+      let scopefound = false;
+      for (let i = 0; i < this.storages.length; i++) {
+        if (this.storages[i].type == type && this.storages[i].host == host) {
+          this.storages[i].keys.push(domstorelist[i].key);
+          scopefound = true;
+          break;
+        }
+      }
+      if (!scopefound) {
+        this.storages.push({host: host,
+                            rawHost: rawHost,
+                            type: type,
+                            size: gLocSvc.domstoremgr.getUsage(rawHost),
+                            keys: [domstorelist[i].key]});
+      }
+    }
+
+    // Load indexedDB entries, unfortunately need to read directory for now. :(
+    // Bug 360858 would make this easier and clean.
+    let dir = Components.classes["@mozilla.org/file/directory_service;1"]
+                        .getService(Components.interfaces.nsIProperties)
+                        .get("ProfD", Components.interfaces.nsIFile);
+    dir.append("IndexedDB");
+    if (dir.exists() && dir.isDirectory()) {
+      // Enumerate subdir entries, names are like "http+++davidflanagan.com",
+      // and filter out the domain name and protocol from that.
+      // gLocSvc.idxdbmgr works as soon as we have a URI.
+      let files = aDir.directoryEntries
+                      .QueryInterface(Ci.nsIDirectoryEnumerator);
+
+       while (files.hasMoreElements()) {
+         let file = files.nextFile;
+         let fName = file.leafName; //TODO: convert this to a URI.
+       }
+    }
+  },
+
+  shutdown: function storage_shutdown() {
+    gDataman.debugMsg("Shutting down storage panel");
+    this.tree.view.selection.clearSelection();
+    this.tree.view = null;
+    this.displayedStorages = [];
+  },
+
+  _getObjID: function storage__getObjID(aIdx) {
+    var curStorage = gStorage.displayedStorages[aIdx];
+    return curStorage.host + "|" + curStorage.type;
+  },
+
+  select: function storage_select() {
+    var selections = gDataman.getTreeSelections(this.tree);
+    this.removeButton.disabled = !selections.length;
+    return true;
+  },
+
+  selectAll: function storage_selectAll() {
+    this.tree.view.selection.selectAll();
+  },
+
+  handleKeyPress: function storage_handleKeyPress(aEvent) {
+    if (aEvent.keyCode == KeyEvent.DOM_VK_DELETE) {
+      this.delete();
+    }
+  },
+
+  sort: function storage_sort(aColumn, aUpdateSelection, aInvertDirection) {
+    // Make sure we have a valid column.
+    let column = aColumn;
+    if (!column) {
+      let sortedCol = this.tree.columns.getSortedColumn();
+      if (sortedCol)
+        column = sortedCol.element;
+      else
+        column = document.getElementById("prefsHostCol");
+    }
+    else if (column.localName == "treecols" || column.localName == "splitter")
+      return;
+
+    if (!column || column.localName != "treecol") {
+      Components.utils.reportError("No column found to sort form data by");
+      return;
+    }
+
+    let dirAscending = column.getAttribute("sortDirection") !=
+                       (aInvertDirection ? "ascending" : "descending");
+    let dirFactor = dirAscending ? 1 : -1;
+
+    // Clear attributes on all columns, we're setting them again after sorting.
+    for (let node = column.parentNode.firstChild; node; node = node.nextSibling) {
+      node.removeAttribute("sortActive");
+      node.removeAttribute("sortDirection");
+    }
+
+    // compare function for two content prefs
+    let compfunc = function storage_sort_compare(aOne, aTwo) {
+      switch (column.id) {
+        case "storageHostCol":
+          return dirFactor * aOne.displayHost.localeCompare(aTwo.displayHost);
+        case "storageTypeCol":
+          return dirFactor * aOne.type.localeCompare(aTwo.type);
+      }
+      return 0;
+    };
+
+    if (aUpdateSelection) {
+      var selectionCache = gDataman.getSelectedIDs(this.tree, this._getObjID);
+    }
+    this.tree.view.selection.clearSelection();
+
+    // Do the actual sorting of the array.
+    this.displayedStorages.sort(compfunc);
+    this.tree.treeBoxObject.invalidate();
+
+    if (aUpdateSelection) {
+      gDataman.restoreSelectionFromIDs(this.tree, this._getObjID, selectionCache);
+    }
+
+    // Set attributes to the sorting we did.
+    column.setAttribute("sortActive", "true");
+    column.setAttribute("sortDirection", dirAscending ? "ascending" : "descending");
+  },
+
+  delete: function storage_delete() {
+    var selections = gDataman.getTreeSelections(this.tree);
+
+    if (selections.length > 1) {
+      let title = gDataman.bundle.getString("storage.deleteSelectedTitle");
+      let msg = gDataman.bundle.getString("storage.deleteSelected");
+      let flags = ((Services.prompt.BUTTON_TITLE_IS_STRING * Services.prompt.BUTTON_POS_0) +
+                   (Services.prompt.BUTTON_TITLE_CANCEL * Services.prompt.BUTTON_POS_1) +
+                   Services.prompt.BUTTON_POS_1_DEFAULT)
+      let yes = gDataman.bundle.getString("storage.deleteSelectedYes");
+      if (Services.prompt.confirmEx(window, title, msg, flags, yes, null, null,
+                                    null, {value: 0}) == 1) // 1=="Cancel" button
+        return;
+    }
+
+    this.tree.view.selection.clearSelection();
+    // Loop backwards so later indexes in the list don't change.
+    for (let i = selections.length - 1; i >= 0; i--) {
+      let delStorage = this.displayedStorages[selections[i]];
+      this.storages.splice(this.storages.indexOf(this.displayedStorages[selections[i]]), 1);
+      this.displayedStorages.splice(selections[i], 1);
+      this.tree.treeBoxObject.rowCountChanged(selections[i], -1);
+      // TODO: stores / type / remove (delStorage)
+    }
+    if (!this.displayedSignons.length)
+      gDomains.removeDomainOrFlag(gDomains.selectedDomain.title, "hasStorage");
+    // Select the entry after the first deleted one or the last of all entries.
+    if (selections.length && this.displayedStorages.length)
+      this.tree.view.selection.toggleSelect(selections[0] < this.displayedStorages.length ?
+                                            selections[0] :
+                                            this.displayedStorages.length - 1);
+  },
+
+  updateContext: function storage_updateContext() {
+    document.getElementById("storage-context-remove").disabled =
+      this.removeButton.disabled;
+    document.getElementById("storage-context-selectall").disabled =
+      this.tree.view.selection.count >= this.tree.view.rowCount;
+  },
+
+  reactToChange: function storage_reactToChange(aSubject, aData) {
+    // aData: 
+  },
+
+  forget: function storage_forget() {
+  },
+
+  // nsITreeView
+  __proto__: gBaseTreeView,
+  get rowCount() {
+    return this.displayedStorages.length;
+  },
+  getCellText: function(aRow, aColumn) {
+    let storage = this.displayedStorages[aRow];
+    switch (aColumn.id) {
+      case "storageHostCol":
+        return storage.host;
+      case "storageTypeCol":
+        return storage.type;
+      case "storageSizeCol":
+        return DownloadUtils.convertByteUnits(storage.size);
     }
   },
 };
