@@ -1281,8 +1281,8 @@ var gPerms = {
       // Show addition box, disable button.
       this.addButton.disabled = true;
       this.addType.removeAllItems(); // Make sure list is clean.
-      let permTypes = ["allowXULXBL", "cookie", "geo", "image", "install",
-                       "password", "popup"];
+      let permTypes = ["allowXULXBL", "cookie", "geo", "image", "indexedDB",
+                       "install", "offline-app", "password", "popup"];
       for (let i = 0; i < permTypes.length; i++) {
         let typeDesc = permTypes[i];
         try {
@@ -1336,10 +1336,16 @@ var gPerms = {
         if (Services.prefs.getIntPref("permissions.default.image") == 2)
           return Services.perms.DENY_ACTION;
         return Services.perms.ALLOW_ACTION;
+      case "indexedDB":
+        return Services.perms.DENY_ACTION;
       case "install":
         if (Services.prefs.getBoolPref("xpinstall.whitelist.required"))
           return Services.perms.DENY_ACTION;
         return Services.perms.ALLOW_ACTION;
+      case "offline-apps":
+        if (Services.prefs.getBoolPref("offline-apps.allow_by_default"))
+          return Services.perms.ALLOW_ACTION;
+        return Services.perms.DENY_ACTION;
       case "password":
         return Services.perms.ALLOW_ACTION;
       case "popup":

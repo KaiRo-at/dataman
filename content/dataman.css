@@ -52,7 +52,8 @@ richlistitem.permission[type="cookie"] {
   -moz-binding: url('chrome://dataman/content/dataman.xml#perm-cookie-item');
 }
 
-richlistitem.permission[type="geo"] {
+richlistitem.permission[type="geo"],
+richlistitem.permission[type="indexedDB"] {
   -moz-binding: url('chrome://dataman/content/dataman.xml#perm-geo-item');
 }
 
