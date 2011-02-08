@@ -2296,18 +2296,33 @@ var gStorage = {
     let dir = Components.classes["@mozilla.org/file/directory_service;1"]
                         .getService(Components.interfaces.nsIProperties)
                         .get("ProfD", Components.interfaces.nsIFile);
-    dir.append("IndexedDB");
+    dir.append("indexedDB");
     if (dir.exists() && dir.isDirectory()) {
       // Enumerate subdir entries, names are like "http+++davidflanagan.com",
       // and filter out the domain name and protocol from that.
       // gLocSvc.idxdbmgr works as soon as we have a URI.
-      let files = aDir.directoryEntries
-                      .QueryInterface(Ci.nsIDirectoryEnumerator);
+      let files = dir.directoryEntries
+                     .QueryInterface(Components.interfaces.nsIDirectoryEnumerator);
+      gDataman.debugMsg("Loading IndexedDB entries");
 
-       while (files.hasMoreElements()) {
-         let file = files.nextFile;
-         let fName = file.leafName; //TODO: convert this to a URI.
-       }
+      while (files.hasMoreElements()) {
+        let file = files.nextFile;
+        // Convert directory name to a URI.
+        let host = file.leafName.replace(/\+\+\+/, '://');
+        let uri = Services.io.newURI(host, null, null);
+        this.storages.push({host: host,
+                            rawHost: uri.host,
+                            type: "indexedDB",
+                            size: 0,
+                            path: file.path});
+        gLocSvc.idxdbmgr.getUsageForURI(uri,
+            function(aUri, aUsage) {
+              gStorage.storages.forEach(function(aElement) {
+                if (aUri.host == aElement.rawHost)
+                  aElement.size = aUsage;
+              });
+            });
+      }
     }
   },
 
@@ -2419,6 +2434,7 @@ var gStorage = {
       this.displayedStorages.splice(selections[i], 1);
       this.tree.treeBoxObject.rowCountChanged(selections[i], -1);
       // TODO: stores / type / remove (delStorage)
+      // indexedDB: gLocSvc.idxdbmgr.clearDatabasesForURI(in nsIURI aURI);
     }
     if (!this.displayedSignons.length)
       gDomains.removeDomainOrFlag(gDomains.selectedDomain.title, "hasStorage");
@@ -2456,7 +2472,8 @@ var gStorage = {
       case "storageTypeCol":
         return storage.type;
       case "storageSizeCol":
-        return DownloadUtils.convertByteUnits(storage.size);
+        return gDataman.bundle.getFormattedString("storageUsage",
+                   DownloadUtils.convertByteUnits(storage.size));
     }
   },
 };
