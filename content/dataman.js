@@ -81,6 +81,9 @@ XPCOMUtils.defineLazyServiceGetter(gLocSvc, "domstoremgr",
 XPCOMUtils.defineLazyServiceGetter(gLocSvc, "idxdbmgr",
                                    "@mozilla.org/dom/indexeddb/manager;1",
                                    "nsIIndexedDatabaseManager");
+XPCOMUtils.defineLazyServiceGetter(gLocSvc, "ssm",
+                                   "@mozilla.org/scriptsecuritymanager;1",
+                                   "nsIScriptSecurityManager");
 
 // :::::::::::::::::::: general functions ::::::::::::::::::::
 var gDataman = {
@@ -2260,21 +2263,22 @@ var gStorage = {
       }
     }
     gDataman.debugMsg("Loading " + domstorelist.length + " DOM Storage entries");
-    // Scopes are reversed, e.g. |moc.elgoog.www.:http:80| (localStore) or |gro.allizom.| (globalStore).
+    // Scopes are reversed, e.g. |moc.elgoog.www.:http:80| (localStorage) or |gro.allizom.| (globalStorage).
     for (let i = 0; i < domstorelist.length; i++) {
       // Get the host from the reversed scope.
       let scopeparts = domstorelist[i].scope.split(":");
-      let host = "", type = "globalStore";
+      let host = "", origHost = "", type = "globalStorage";
       for (let c = 0; c < scopeparts[0].length; c++) {
-        host = scopeparts[0].charAt(c) + host;
+        origHost = scopeparts[0].charAt(c) + origHost;
       }
-      let rawHost = host.replace(/^\./, "");
+      let rawHost = host = origHost.replace(/^\./, "");
       if (scopeparts.length > 1) {
-        // This is a localStore, [1] is protocol, [3] is port.
-        type = "localStore";
-        host = scopeparts[1] + "://" + host;
+        // This is a localStore, [1] is protocol, [2] is port.
+        type = "localStorage";
+        host = scopeparts[1].length ? scopeparts[1] + "://" + host : host;
         // Add port if it's not the default for this protocol.
-        if (!((scopeparts[1] == "http" && scopeparts[2] == 80) ||
+        if (scopeparts[2] &&
+            !((scopeparts[1] == "http" && scopeparts[2] == 80) ||
               (scopeparts[1] == "https" && scopeparts[2] == 443))) {
           host = host + ":" + scopeparts[2];
         }
@@ -2293,6 +2297,7 @@ var gStorage = {
                             rawHost: rawHost,
                             type: type,
                             size: gLocSvc.domstoremgr.getUsage(rawHost),
+                            origHost: origHost,
                             keys: [domstorelist[i].key]});
       }
     }
@@ -2314,7 +2319,7 @@ var gStorage = {
       while (files.hasMoreElements()) {
         let file = files.nextFile;
         // Convert directory name to a URI.
-        let host = file.leafName.replace(/\+\+\+/, '://');
+        let host = file.leafName.replace(/\+\+\+/, "://");
         let uri = Services.io.newURI(host, null, null);
         this.storages.push({host: host,
                             rawHost: uri.host,
@@ -2368,7 +2373,7 @@ var gStorage = {
       if (sortedCol)
         column = sortedCol.element;
       else
-        column = document.getElementById("prefsHostCol");
+        column = document.getElementById("storageHostCol");
     }
     else if (column.localName == "treecols" || column.localName == "splitter")
       return;
@@ -2436,13 +2441,33 @@ var gStorage = {
     // Loop backwards so later indexes in the list don't change.
     for (let i = selections.length - 1; i >= 0; i--) {
       let delStorage = this.displayedStorages[selections[i]];
+      if (delStorage.type == "globalStorage") // TODO: No idea how to remove this.
+        break;
       this.storages.splice(this.storages.indexOf(this.displayedStorages[selections[i]]), 1);
       this.displayedStorages.splice(selections[i], 1);
       this.tree.treeBoxObject.rowCountChanged(selections[i], -1);
-      // TODO: stores / type / remove (delStorage)
-      // indexedDB: gLocSvc.idxdbmgr.clearDatabasesForURI(in nsIURI aURI);
+      // Remove the actual entry.
+      switch (delStorage.type) {
+        case "appCache":
+          gLocSvc.appcache.getActiveCache(delStorage.groupID).discard();
+          break;
+        case "globalStorage": // TODO: No idea how to do remove this.
+          break;
+        case "localStorage":
+          let testHost = delStorage.host;
+          if (!/:/.test(testHost))
+            testHost = "http://" + testHost;
+          let uri = Services.io.newURI(testHost, null, null);
+          let principal = gLocSvc.ssm.getCodebasePrincipal(uri);
+          let storage = gLocSvc.domstoremgr.getLocalStorageForPrincipal(principal, "");
+          storage.clear();
+          break;
+        case "indexedDB":
+          gLocSvc.idxdbmgr.clearDatabasesForURI(Services.io.newURI(delStorage.host, null, null));
+          break;
+      }
     }
-    if (!this.displayedSignons.length)
+    if (!this.displayedStorages.length)
       gDomains.removeDomainOrFlag(gDomains.selectedDomain.title, "hasStorage");
     // Select the entry after the first deleted one or the last of all entries.
     if (selections.length && this.displayedStorages.length)
@@ -2460,6 +2485,9 @@ var gStorage = {
 
   reactToChange: function storage_reactToChange(aSubject, aData) {
     // aData: 
+    // "dom-storage-changed" (globalStorage) and
+    // "dom-storage2-changed" (sessionStorage, localStorage with interface
+    // nsIDOMStorageEvent)
   },
 
   forget: function storage_forget() {
