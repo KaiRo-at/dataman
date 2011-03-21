@@ -179,6 +179,8 @@
 <!ENTITY forget.preferences.accesskey "o">
 <!ENTITY forget.passwords.label "Passwords">
 <!ENTITY forget.passwords.accesskey "a">
+<!ENTITY forget.storage.label "Storage">
+<!ENTITY forget.storage.accesskey "S">
 <!ENTITY forget.formdata.label "Form Data">
 <!ENTITY forget.formdata.accesskey "D">
 

@@ -112,6 +112,8 @@ var gDataman = {
     Services.obs.addObserver(this, "passwordmgr-storage-changed", false);
     Services.contentPrefs.addObserver(null, this);
     Services.obs.addObserver(this, "satchel-storage-changed", false);
+    Services.obs.addObserver(this, "dom-storage-changed", false);
+    Services.obs.addObserver(this, "dom-storage2-changed", false);
 
     gTabs.initialize();
     gDomains.initialize();
@@ -123,6 +125,8 @@ var gDataman = {
     Services.obs.removeObserver(this, "passwordmgr-storage-changed");
     Services.contentPrefs.removeObserver(null, this);
     Services.obs.removeObserver(this, "satchel-storage-changed");
+    Services.obs.removeObserver(this, "dom-storage-changed");
+    Services.obs.removeObserver(this, "dom-storage2-changed");
 
     gDomains.shutdown();
   },
@@ -186,6 +190,10 @@ var gDataman = {
       case "satchel-storage-changed":
         gFormdata.reactToChange(aSubject, aData);
         break;
+      case "dom-storage-changed": // globalStorage
+      case "dom-storage2-changed": // sessionStorage, localStorage
+        gStorage.reactToChange(aSubject, aData);
+        break;
       default:
         gDataman.debugError("Unexpected change topic observed: " + aTopic);
         break;
@@ -238,7 +246,7 @@ var gDataman = {
     return selectionCache;
   },
 
-  restoreSelectionFromIDs: function dataman_getSelectedIDs(aTree, aIDFunction, aCachedIDs) {
+  restoreSelectionFromIDs: function dataman_restoreSelectionFromIDs(aTree, aIDFunction, aCachedIDs) {
     // Restore selection from cached IDs (as possible).
     if (!aCachedIDs.length)
       return;
@@ -2251,7 +2259,8 @@ var gStorage = {
                                  .openDatabase(file);
       try {
         if (connection.tableExists("webappsstore2")) {
-          var statement = connection.createStatement("SELECT scope, key FROM webappsstore2");
+          var statement =
+              connection.createStatement("SELECT scope, key FROM webappsstore2");
           while (statement.executeStep())
             domstorelist.push({scope: statement.getString(0),
                                key: statement.getString(1)});
@@ -2443,29 +2452,12 @@ var gStorage = {
       let delStorage = this.displayedStorages[selections[i]];
       if (delStorage.type == "globalStorage") // TODO: No idea how to remove this.
         break;
-      this.storages.splice(this.storages.indexOf(this.displayedStorages[selections[i]]), 1);
+      this.storages.splice(
+          this.storages.indexOf(this.displayedStorages[selections[i]]), 1);
       this.displayedStorages.splice(selections[i], 1);
       this.tree.treeBoxObject.rowCountChanged(selections[i], -1);
       // Remove the actual entry.
-      switch (delStorage.type) {
-        case "appCache":
-          gLocSvc.appcache.getActiveCache(delStorage.groupID).discard();
-          break;
-        case "globalStorage": // TODO: No idea how to do remove this.
-          break;
-        case "localStorage":
-          let testHost = delStorage.host;
-          if (!/:/.test(testHost))
-            testHost = "http://" + testHost;
-          let uri = Services.io.newURI(testHost, null, null);
-          let principal = gLocSvc.ssm.getCodebasePrincipal(uri);
-          let storage = gLocSvc.domstoremgr.getLocalStorageForPrincipal(principal, "");
-          storage.clear();
-          break;
-        case "indexedDB":
-          gLocSvc.idxdbmgr.clearDatabasesForURI(Services.io.newURI(delStorage.host, null, null));
-          break;
-      }
+      this._deleteItem(delStorage);
     }
     if (!this.displayedStorages.length)
       gDomains.removeDomainOrFlag(gDomains.selectedDomain.title, "hasStorage");
@@ -2476,6 +2468,30 @@ var gStorage = {
                                             this.displayedStorages.length - 1);
   },
 
+  _deleteItem: function storage__deleteItem(aStorageItem) {
+    switch (aStorageItem.type) {
+      case "appCache":
+        gLocSvc.appcache.getActiveCache(aStorageItem.groupID).discard();
+        break;
+      case "globalStorage": // TODO: No idea how to do remove this.
+        break;
+      case "localStorage":
+        let testHost = aStorageItem.host;
+        if (!/:/.test(testHost))
+          testHost = "http://" + testHost;
+        let uri = Services.io.newURI(testHost, null, null);
+        let principal = gLocSvc.ssm.getCodebasePrincipal(uri);
+        let storage = gLocSvc.domstoremgr
+                             .getLocalStorageForPrincipal(principal, "");
+        storage.clear();
+        break;
+      case "indexedDB":
+        gLocSvc.idxdbmgr.clearDatabasesForURI(
+            Services.io.newURI(aStorageItem.host, null, null));
+        break;
+    }
+  },
+
   updateContext: function storage_updateContext() {
     document.getElementById("storage-context-remove").disabled =
       this.removeButton.disabled;
@@ -2484,13 +2500,34 @@ var gStorage = {
   },
 
   reactToChange: function storage_reactToChange(aSubject, aData) {
-    // aData: 
-    // "dom-storage-changed" (globalStorage) and
-    // "dom-storage2-changed" (sessionStorage, localStorage with interface
-    // nsIDOMStorageEvent)
+    // aData: null (sessionStorage, localStorage) + nsIDOMStorageEvent in aSubject
+    //        domain name (globalStorage) + nsIDOMStorageObsolete in aSubject
+    //        ??? for appCache and indexedDB
+    let type;
+    if (aSubject instanceof Components.interfaces.nsIDOMStorageEvent) {
+      type = "localStorage";
+      // session storage also comes here, but currently not supported
+      // aData: null, all data in aSubject
+      // see https://developer.mozilla.org/en/DOM/Event/StorageEvent
+    }
+    else if (aSubject instanceof Components.interfaces.nsIDOMStorageObsolete) {
+      type = "globalStorage";
+      // aData: domain name
+    }
+    else {
+      Components.utils.reportError("Observed an unrecognized storage change of type " + aData);
+    }
+    gDataman.debugMsg("Found storage event for: " + type);
   },
 
   forget: function storage_forget() {
+    for (let i = 0; i < this.storages.length; i++) {
+      if (gDomains.hostMatchesSelected(this.storages[i].hostname)) {
+        this._deleteItem(this.storages[i]);
+        this.storages.splice(i, 1);
+      }
+    }
+    gDomains.removeDomainOrFlag(gDomains.selectedDomain.title, "hasStorage");
   },
 
   // nsITreeView
@@ -2856,11 +2893,13 @@ var gForget = {
   forgetPermissions: null,
   forgetPreferences: null,
   forgetPasswords: null,
+  forgetStorage: null,
   forgetFormdata: null,
   forgetCookiesLabel: null,
   forgetPermissionsLabel: null,
   forgetPreferencesLabel: null,
   forgetPasswordsLabel: null,
+  forgetStorageLabel: null,
   forgetFormdataLabel: null,
   forgetButton: null,
 
@@ -2869,7 +2908,8 @@ var gForget = {
 
     this.forgetDesc = document.getElementById("forgetDesc");
     ["forgetCookies", "forgetPermissions", "forgetPreferences",
-     "forgetPasswords", "forgetFormdata"].forEach(function(elemID) {
+     "forgetPasswords", "forgetStorage", "forgetFormdata"]
+    .forEach(function(elemID) {
       gForget[elemID] = document.getElementById(elemID);
       gForget[elemID].hidden = false;
       gForget[elemID].checked = false;
@@ -2890,6 +2930,7 @@ var gForget = {
     this.forgetPermissions.disabled = !gDomains.selectedDomain.hasPermissions;
     this.forgetPreferences.disabled = !gDomains.selectedDomain.hasPreferences;
     this.forgetPasswords.disabled = !gDomains.selectedDomain.hasPasswords;
+    this.forgetStorage.disabled = !gDomains.selectedDomain.hasStorage;
     this.forgetFormdata.disabled = !gDomains.selectedDomain.hasFormData;
     this.forgetFormdata.hidden = !gDomains.selectedDomain.hasFormData;
     this.updateOptions();
@@ -2904,6 +2945,7 @@ var gForget = {
                                    this.forgetPermissions.checked ||
                                    this.forgetPreferences.checked ||
                                    this.forgetPasswords.checked ||
+                                   this.forgetStorage.checked ||
                                    this.forgetFormdata.checked);
   },
 
@@ -2944,6 +2986,12 @@ var gForget = {
       this.forgetPasswordsLabel.hidden = false;
     }
     this.forgetPasswords.hidden = true;
+
+    if (this.forgetStorage.checked) {
+      gStorage.forget();
+      this.forgetStorageLabel.hidden = false;
+    }
+    this.forgetStorage.hidden = true;
 
     if (this.forgetFormdata.checked) {
       gFormdata.forget();

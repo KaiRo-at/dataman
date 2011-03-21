@@ -546,6 +546,16 @@
                    hidden="true"/>
           </hbox>
           <hbox>
+            <checkbox id="forgetStorage"
+                      label="&forget.storage.label;"
+                      accesskey="&forget.storage.accesskey;"
+                      disabled="true"
+                      oncommand="gForget.updateOptions();"/>
+            <label id="forgetStorageLabel"
+                   value="&forget.storage.label;"
+                   hidden="true"/>
+          </hbox>
+          <hbox>
             <checkbox id="forgetFormdata"
                       label="&forget.formdata.label;"
                       accesskey="&forget.formdata.accesskey;"
