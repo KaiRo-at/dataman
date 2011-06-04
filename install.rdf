@@ -4,6 +4,7 @@
      xmlns:em="http://www.mozilla.org/2004/em-rdf#">
   <Description about="urn:mozilla:install-manifest">
     <em:id>@INSTALL_EXTENSION_ID@</em:id>
+    <em:type>2</em:type>
     <em:version>@EXTENSION_VERSION@</em:version>
     <em:name>Tahoe Data Manager</em:name>
     <em:description>Central access point to Cookies, Content Preferences, Permissions, Passwords, Form Data</em:description>
