@@ -41,11 +41,13 @@ Services.obs.addObserver(DataManagerPageInfoLoad, "page-info-dialog-loaded", fal
 window.addEventListener("unload", DataManagerPageInfoUnload, false);
 
 function toDataManager(aView) {
+  Services.obs.addObserver(function loadview(aSubject, aTopic, aData) {
+    Services.obs.notifyObservers(null, "dataman-loadview", aView);
+    Services.obs.removeObserver(loadview, "dataman-exists");
+  }, "dataman-exists", false);
+  Services.obs.notifyObservers(null, "dataman-exist-request", "");
   Services.wm.getMostRecentWindow("navigator:browser")
-             .switchToTabHavingURI("about:data", true, function(browser) {
-    if (aView)
-      browser.contentWindow.wrappedJSObject.gDataman.loadView(aView);
-  });
+             .switchToTabHavingURI("about:data", true);
 }
 
 function DataManagerPageInfoLoad() {

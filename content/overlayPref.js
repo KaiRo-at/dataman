@@ -47,10 +47,12 @@ function toDataManager(aView) {
                                  null,
                                  "chrome,all,dialog=no",
                                  null);
-  win.switchToTabHavingURI("about:data", true, function(browser) {
-    if (aView)
-      browser.contentWindow.wrappedJSObject.gDataman.loadView(aView);
-  });
+  Services.obs.addObserver(function loadview(aSubject, aTopic, aData) {
+    Services.obs.notifyObservers(null, "dataman-loadview", aView);
+    Services.obs.removeObserver(loadview, "dataman-exists");
+  }, "dataman-exists", false);
+  Services.obs.notifyObservers(null, "dataman-exist-request", "");
+  win.switchToTabHavingURI("about:data", true);
 }
 
 function _getBrowserURL() {

@@ -92,6 +92,10 @@ var gDataman = {
   viewToLoad: ["*", "formdata"],
 
   initialize: function dataman_initialize() {
+    Services.obs.addObserver(this, "dataman-loadview", false);
+    Services.obs.notifyObservers(window, "dataman-exists", "");
+    Services.obs.addObserver(this, "dataman-exist-request", false);
+
     try {
       this.debug = Services.prefs.getBoolPref("data_manager.debug");
     }
@@ -127,6 +131,9 @@ var gDataman = {
     Services.obs.removeObserver(this, "satchel-storage-changed");
     Services.obs.removeObserver(this, "dom-storage-changed");
     Services.obs.removeObserver(this, "dom-storage2-changed");
+
+    Services.obs.removeObserver(this, "dataman-loadview");
+    Services.obs.removeObserver(this, "dataman-exist-request");
 
     gDomains.shutdown();
   },
@@ -175,6 +182,12 @@ var gDataman = {
   observe: function co_observe(aSubject, aTopic, aData) {
     gDataman.debugMsg("Observed: " + aTopic + " - " + aData);
     switch (aTopic) {
+      case "dataman-exist-request":
+        Services.obs.notifyObservers(window, "dataman-exists", "");
+        break;
+      case "dataman-loadview":
+        this.loadView(aData);
+        break;
       case "cookie-changed":
         gCookies.reactToChange(aSubject, aData);
         break;
