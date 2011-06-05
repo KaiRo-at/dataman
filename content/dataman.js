@@ -92,14 +92,15 @@ var gDataman = {
   viewToLoad: ["*", "formdata"],
 
   initialize: function dataman_initialize() {
-    Services.obs.addObserver(this, "dataman-loadview", false);
-    Services.obs.notifyObservers(window, "dataman-exists", "");
-    Services.obs.addObserver(this, "dataman-exist-request", false);
-
     try {
       this.debug = Services.prefs.getBoolPref("data_manager.debug");
     }
     catch (e) {}
+
+    Services.obs.addObserver(this, "dataman-loadview", false);
+    Services.obs.notifyObservers(window, "dataman-exists", "");
+    Services.obs.addObserver(this, "dataman-exist-request", false);
+
     this.bundle = document.getElementById("datamanBundle");
 
     // Add ourselves to the whitelist for disabling browser chrome.
@@ -136,6 +137,7 @@ var gDataman = {
     Services.obs.removeObserver(this, "dataman-exist-request");
 
     gDomains.shutdown();
+    Services.obs.notifyObservers(window, "dataman-closed", "");
   },
 
   loadView: function dataman_loadView(aView) {
@@ -2515,7 +2517,7 @@ var gStorage = {
   reactToChange: function storage_reactToChange(aSubject, aData) {
     // aData: null (sessionStorage, localStorage) + nsIDOMStorageEvent in aSubject
     //        domain name (globalStorage) + nsIDOMStorageObsolete in aSubject
-    //        ??? for appCache and indexedDB
+    //        --- for appCache and indexedDB, no change notifications are known!
     let type;
     if (aSubject instanceof Components.interfaces.nsIDOMStorageEvent) {
       type = "localStorage";

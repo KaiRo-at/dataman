@@ -77,7 +77,10 @@ function test_switch_panel(aWin) {
     "Step " + testIndex + ": Cookies panel is selected");
   aWin.close();
   gBrowser.addTab();
-  toDataManager("www.getpersonas.com:443|permissions");
+  Services.obs.addObserver(function loadNext(aSubject, aTopic, aData) {
+    toDataManager("www.getpersonas.com:443|permissions");
+    Services.obs.removeObserver(loadNext, "dataman-closed");
+  }, "dataman-closed", false);
 },
 
 function test_load_with_panel(aWin) {
@@ -89,7 +92,10 @@ function test_load_with_panel(aWin) {
     "Step " + testIndex + ": Permissions panel is selected");
   aWin.close();
   gBrowser.addTab();
-  toDataManager("getpersonas.com|preferences");
+  Services.obs.addObserver(function loadNext(aSubject, aTopic, aData) {
+    toDataManager("getpersonas.com|preferences");
+    Services.obs.removeObserver(loadNext, "dataman-closed");
+  }, "dataman-closed", false);
 },
 
 function test_load_disabled_panel(aWin) {
@@ -101,7 +107,10 @@ function test_load_disabled_panel(aWin) {
     "Step " + testIndex + ": Cookies panel is selected");
   aWin.close();
   gBrowser.addTab();
-  toDataManager("getpersonas.com|unknown");
+  Services.obs.addObserver(function loadNext(aSubject, aTopic, aData) {
+    toDataManager("getpersonas.com|unknown");
+    Services.obs.removeObserver(loadNext, "dataman-closed");
+  }, "dataman-closed", false);
 },
 
 function test_load_inexistent_panel(aWin) {
@@ -113,7 +122,10 @@ function test_load_inexistent_panel(aWin) {
     "Step " + testIndex + ": Cookies panel is selected");
   aWin.close();
   gBrowser.addTab();
-  toDataManager("unknowndomainexample.com");
+  Services.obs.addObserver(function loadNext(aSubject, aTopic, aData) {
+    toDataManager("unknowndomainexample.com");
+    Services.obs.removeObserver(loadNext, "dataman-closed");
+  }, "dataman-closed", false);
 },
 
 function test_load_unknown_domain(aWin) {
@@ -125,7 +137,10 @@ function test_load_unknown_domain(aWin) {
     "Step " + testIndex + ": Permissions panel is selected");
   aWin.close();
   gBrowser.addTab();
-  toDataManager("|cookies");
+  Services.obs.addObserver(function loadNext(aSubject, aTopic, aData) {
+    toDataManager("|cookies");
+    Services.obs.removeObserver(loadNext, "dataman-closed");
+  }, "dataman-closed", false);
 },
 
 function test_load_datatype(aWin) {
@@ -168,7 +183,10 @@ function test_escape_datatype(aWin) {
     "Step " + testIndex + ": The correct domain is selected");
   aWin.close();
   gBrowser.addTab();
-  toDataManager("sub.getpersonas.com:8888|permissions|add|popup");
+  Services.obs.addObserver(function loadNext(aSubject, aTopic, aData) {
+    toDataManager("sub.getpersonas.com:8888|permissions|add|popup");
+    Services.obs.removeObserver(loadNext, "dataman-closed");
+  }, "dataman-closed", false);
 },
 
 function test_load_add_perm_existdomain(aWin) {
