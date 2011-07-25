@@ -89,6 +89,7 @@ XPCOMUtils.defineLazyServiceGetter(gLocSvc, "ssm",
 var gDataman = {
   bundle: null,
   debug: false,
+  timer: null,
   viewToLoad: ["*", "formdata"],
 
   initialize: function dataman_initialize() {
@@ -119,6 +120,9 @@ var gDataman = {
     Services.obs.addObserver(this, "satchel-storage-changed", false);
     Services.obs.addObserver(this, "dom-storage-changed", false);
     Services.obs.addObserver(this, "dom-storage2-changed", false);
+
+    this.timer = Components.classes["@mozilla.org/timer;1"]
+                           .createInstance(Components.interfaces.nsITimer);
 
     gTabs.initialize();
     gDomains.initialize();
@@ -213,6 +217,12 @@ var gDataman = {
         gDataman.debugError("Unexpected change topic observed: " + aTopic);
         break;
     }
+  },
+
+  // Compat with nsITimerCallback so we can be used in a timer.
+  notify: function(timer) {
+    gDataman.debugMsg("Timer fired, reloading storage: " + Date.now()/1000);
+    gStorage.reloadList();
   },
 
   onContentPrefSet: function co_onContentPrefSet(aGroup, aName, aValue) {
@@ -394,6 +404,10 @@ var gDomains = {
         gDomains.addDomainOrFlag(gStorage.storages[i].rawHost, "hasStorage");
       }
       gDomains.search(gDomains.searchfield.value);
+      // As we don't get notified of storage changes properly, reload on timer.
+      // The repeat time is in milliseconds, we're using 10 min for now.
+      gDataman.timer.initWithCallback(gDataman, 10 * 60000,
+          Components.interfaces.nsITimer.TYPE_REPEATING_SLACK);
       yield setTimeout(nextStep, 0);
 
       gDataman.debugMsg("Domain list built: " + Date.now()/1000);
@@ -406,6 +420,7 @@ var gDomains = {
   },
 
   shutdown: function domain_shutdown() {
+    gDataman.timer.cancel();
     gTabs.shutdown();
     this.tree.view = null;
   },
@@ -1217,7 +1232,6 @@ var gCookies = {
             this.tree.treeBoxObject.invalidateRow(disp_idx);
         }
         else if (aData == "deleted") {
-          gDataman.debugMsg("removing cookie for " + this.cookies[idx].host + " (" + this.cookies[idx].rawHost + ")!");
           this.cookies.splice(idx, 1);
           if (affectsLoaded) {
             this.displayedCookies.splice(disp_idx, 1);
@@ -2272,6 +2286,8 @@ var gStorage = {
   },
 
   loadList: function storage_loadList() {
+    this.storages = [];
+
     // Load appCache entries.
     let groups = gLocSvc.appcache.getGroups();
     gDataman.debugMsg("Loading " + groups.length + " appcache entries");
@@ -2445,7 +2461,7 @@ var gStorage = {
     let compfunc = function storage_sort_compare(aOne, aTwo) {
       switch (column.id) {
         case "storageHostCol":
-          return dirFactor * aOne.displayHost.localeCompare(aTwo.displayHost);
+          return dirFactor * aOne.host.localeCompare(aTwo.host);
         case "storageTypeCol":
           return dirFactor * aOne.type.localeCompare(aTwo.type);
       }
@@ -2538,10 +2554,43 @@ var gStorage = {
       this.tree.view.selection.count >= this.tree.view.rowCount;
   },
 
+  reloadList: function storage_reloadList() {
+    // As many storage types don't have app-wide functions to notify us of
+    // changes, call this one periodically to completely redo the storage
+    // list and so keep the Data Manager up to date.
+    var selectionCache = [];
+    if (this.displayedStorages.length) {
+      selectionCache = gDataman.getSelectedIDs(this.tree, this._getObjID);
+      this.displayedStorages = [];
+    }
+    this.loadList();
+    var domainList = [];
+    for (let i = 0; i < this.storages.length; i++) {
+      let domain = gDomains.getDomainFromHost(this.storages[i].rawHost);
+      if (domainList.indexOf(domain) == -1)
+        domainList.push(domain);
+    }
+    gDomains.resetFlagToDomains("hasStorage", domainList);
+    // Restore the local panel display if needed.
+    if (gTabs.activePanel == "storagePanel" &&
+        gDomains.selectedDomain.hasStorage) {
+      this.tree.treeBoxObject.beginUpdateBatch();
+      this.displayedStorages = this.storages.filter(
+        function (aStorage) {
+          return gDomains.hostMatchesSelected(aStorage.rawHost);
+        });
+      this.sort(null, false, false);
+      gDataman.restoreSelectionFromIDs(this.tree, this._getObjID, selectionCache);
+      this.tree.treeBoxObject.endUpdateBatch();
+    }
+  },
+
   reactToChange: function storage_reactToChange(aSubject, aData) {
     // aData: null (sessionStorage, localStorage) + nsIDOMStorageEvent in aSubject
     //        domain name (globalStorage) + nsIDOMStorageObsolete in aSubject
     //        --- for appCache and indexedDB, no change notifications are known!
+    //        --- because of that, we don't do anything here and instead use
+    //            reloadList periodically
     let type;
     if (aSubject instanceof Components.interfaces.nsIDOMStorageEvent) {
       type = "localStorage";

@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html manifest="dataman_storage.appcache">
+<head>
+<script>
+applicationCache.update();
+localStorage.setItem("localtest", "foo");
+globalStorage['mochitest'].setItem("globaltest", "bar");
+</script>
+</head>
+<body>
+<h1>Test</h1>
+</body>
+</html>

@@ -111,7 +111,7 @@ function test() {
           Services.obs.removeObserver(testObs, TEST_DONE);
           gLocSvc.cookie.removeAll();
           gLocSvc.fhist.removeAllEntries();
-          finish();
+          setTimeout(finish, 0);
         }
       }
     }
@@ -732,6 +732,52 @@ function test_idn(aWin) {
      "After deleting, correctly switched back to permissions panel");
 
   Services.obs.notifyObservers(window, TEST_DONE, null);
+},
+
+function test_storage(aWin) {
+  Services.perms.add(Services.io.newURI("chrome://mochitests/content/browser/", null, null),
+                     "offline-app", Services.perms.ALLOW_ACTION);
+  Services.perms.add(Services.io.newURI("chrome://mochitests/content/browser/", null, null),
+                     "indexedDB", Services.perms.ALLOW_ACTION);
+
+  let rootDir = getRootDirectory(gTestPath);
+  let testURL = rootDir + "dataman_storage.html";
+  let storagetab = gBrowser.addTab(testURL);
+  function dmStorageOpenListener() {
+    storagetab.removeEventListener("load", dmStorageOpenListener, false);
+    aWin.gStorage.reloadList();
+    aWin.gDomains.tree.view.selection.select(9);
+    is(aWin.gDomains.selectedDomain.title, "mochitests",
+      "For storage tests, correct domain is selected");
+    is(aWin.document.getElementById("storageTab").disabled, false,
+      "Storage panel is enabled");
+    aWin.gTabs.tabbox.selectedTab = aWin.document.getElementById("storageTab");
+    is(aWin.gTabs.activePanel, "storagePanel",
+      "Storage panel is selected");
+    is(aWin.gStorage.tree.view.rowCount, 3,
+       "The correct number of storages is listed");
+
+    aWin.document.getElementById("domain-context-forget").click();
+    is(aWin.gTabs.activePanel, "forgetPanel",
+      "Forget panel is selected");
+
+    aWin.document.getElementById("forgetPermissions").click();
+    aWin.document.getElementById("forgetStorage").click();
+    aWin.document.getElementById("forgetButton").click();
+    is(aWin.document.getElementById("forgetTab").hidden, true,
+      "Forget tab is hidden again");
+    is(aWin.document.getElementById("forgetTab").disabled, true,
+      "Forget panel is disabled again");
+
+    is(aWin.gDomains.tree.view.rowCount, gPreexistingDomains + 4,
+      "The storage domain has been removed from the list");
+    is(aWin.gDomains.tree.view.selection.count, 0,
+      "No domain is selected");
+
+    gBrowser.removeTab(storagetab);
+    Services.obs.notifyObservers(window, TEST_DONE, null);
+  }
+  storagetab.addEventListener("load", dmStorageOpenListener, false);
 },
 
 function test_close(aWin) {
