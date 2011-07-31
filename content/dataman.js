@@ -45,18 +45,24 @@ if (!("contentPrefs" in Services))
   XPCOMUtils.defineLazyServiceGetter(Services, "contentPrefs",
                                      "@mozilla.org/content-pref/service;1",
                                      "nsIContentPrefService");
+// make this available in older versions, newer ones (2.0b8pre) have it already
+if (!("eTLD" in Services))
+  XPCOMUtils.defineLazyServiceGetter(Services, "eTLD",
+                                     "@mozilla.org/network/effective-tld-service;1",
+                                     "nsIEffectiveTLDService");
+// make this available in older versions, newer ones (6.0a1) have it already
+if (!("logins" in Services))
+  XPCOMUtils.defineLazyServiceGetter(Services, "logins",
+                                     "@mozilla.org/login-manager;1",
+                                     "nsILoginManager");
+if (!("cookies" in Services))
+  XPCOMUtils.defineLazyServiceGetter(Services, "cookies",
+                                     "@mozilla.org/cookiemanager;1",
+                                     "nsICookieManager2");
+
 
 // locally loaded services
 var gLocSvc = {};
-XPCOMUtils.defineLazyServiceGetter(gLocSvc, "eTLD",
-                                   "@mozilla.org/network/effective-tld-service;1",
-                                   "nsIEffectiveTLDService");
-XPCOMUtils.defineLazyServiceGetter(gLocSvc, "cookie",
-                                   "@mozilla.org/cookiemanager;1",
-                                   "nsICookieManager2");
-XPCOMUtils.defineLazyServiceGetter(gLocSvc, "pwd",
-                                   "@mozilla.org/login-manager;1",
-                                   "nsILoginManager");
 XPCOMUtils.defineLazyServiceGetter(gLocSvc, "date",
                                    "@mozilla.org/intl/scriptabledateformat;1",
                                    "nsIScriptableDateFormat");
@@ -364,7 +370,7 @@ var gDomains = {
       // Add domains for password rejects to permissions.
       gDataman.debugMsg("Add pwd reject permissions to domain list: " + Date.now()/1000);
       gDomains.ignoreUpdate = true;
-      let rejectHosts = gLocSvc.pwd.getAllDisabledHosts();
+      let rejectHosts = Services.logins.getAllDisabledHosts();
       for (let i = 0; i < rejectHosts.length; i++)
         gDomains.addDomainOrFlag(rejectHosts[i], "hasPermissions");
       gDomains.ignoreUpdate = false;
@@ -561,7 +567,7 @@ var gDomains = {
 
       var domain;
       try {
-        domain = gLocSvc.eTLD.getBaseDomainFromHost(hostName);
+        domain = Services.eTLD.getBaseDomainFromHost(hostName);
       }
       catch (e) {
         gDataman.debugError("Error while trying to get domain from host name: " + hostName);
@@ -948,7 +954,7 @@ var gCookies = {
 
   loadList: function cookies_loadList() {
     this.cookies = [];
-    let enumerator = gLocSvc.cookie.enumerator;
+    let enumerator = Services.cookies.enumerator;
     while (enumerator.hasMoreElements()) {
       let nextCookie = enumerator.getNext();
       if (!nextCookie) break;
@@ -1129,8 +1135,8 @@ var gCookies = {
       this.cookies.splice(this.cookies.indexOf(this.displayedCookies[selections[i]]), 1);
       this.displayedCookies.splice(selections[i], 1);
       this.tree.treeBoxObject.rowCountChanged(selections[i], -1);
-      gLocSvc.cookie.remove(delCookie.host, delCookie.name, delCookie.path,
-                            this.blockOnRemove.checked);
+      Services.cookies.remove(delCookie.host, delCookie.name, delCookie.path,
+                              this.blockOnRemove.checked);
     }
     if (!this.displayedCookies.length)
       gDomains.removeDomainOrFlag(gDomains.selectedDomain.title, "hasCookies");
@@ -1253,8 +1259,8 @@ var gCookies = {
         // Remove from internal list needs to be before actually deleting.
         let delCookie = this.cookies[i];
         this.cookies.splice(i, 1);
-        gLocSvc.cookie.remove(delCookie.host, delCookie.name,
-                              delCookie.path, false);
+        Services.cookies.remove(delCookie.host, delCookie.name,
+                                delCookie.path, false);
       }
     }
     gDomains.removeDomainOrFlag(gDomains.selectedDomain.title, "hasCookies");
@@ -1308,7 +1314,7 @@ var gPerms = {
       }
     }
     // Visually treat password rejects like permissions.
-    let rejectHosts = gLocSvc.pwd.getAllDisabledHosts();
+    let rejectHosts = Services.logins.getAllDisabledHosts();
     for (let i = 0; i < rejectHosts.length; i++) {
       if (gDomains.hostMatchesSelected(rejectHosts[i])) {
         let permElem = document.createElement("richlistitem");
@@ -1452,7 +1458,7 @@ var gPerms = {
             if (domain == gDomains.getDomainFromHost(nextPermission.host.replace(/^\./, "")))
               haveDomainPerms = true;
           }
-          let rejectHosts = gLocSvc.pwd.getAllDisabledHosts();
+          let rejectHosts = Services.logins.getAllDisabledHosts();
           for (let i = 0; i < rejectHosts.length; i++) {
             if (domain == gDomains.getDomainFromHost(rejectHosts[i]))
               haveDomainPerms = true;
@@ -1486,7 +1492,7 @@ var gPerms = {
       if (aData == "cleared") {
         let domainList = [];
         // Blocked passwords still belong in the list.
-        let rejectHosts = gLocSvc.pwd.getAllDisabledHosts();
+        let rejectHosts = Services.logins.getAllDisabledHosts();
         for (let i = 0; i < rejectHosts.length; i++) {
           let dom = gDomains.getDomainFromHost(rejectHosts[i]);
           if (domainList.indexOf(dom) == -1)
@@ -1524,7 +1530,7 @@ var gPerms = {
             if (domain == gDomains.getDomainFromHost(nextPermission.host.replace(/^\./, "")))
               haveDomainPerms = true;
           }
-          let rejectHosts = gLocSvc.pwd.getAllDisabledHosts();
+          let rejectHosts = Services.logins.getAllDisabledHosts();
           for (let i = 0; i < rejectHosts.length; i++) {
             if (domain == gDomains.getDomainFromHost(rejectHosts[i]))
               haveDomainPerms = true;
@@ -1574,10 +1580,10 @@ var gPerms = {
       Services.perms.remove(delPerms[i].host, delPerms[i].type);
     }
     // Also remove all password rejects.
-    let rejectHosts = gLocSvc.pwd.getAllDisabledHosts();
+    let rejectHosts = Services.logins.getAllDisabledHosts();
     for (let i = 0; i < rejectHosts.length; i++) {
       if (gDomains.hostMatchesSelected(rejectHosts[i])) {
-        gLocSvc.pwd.setLoginSavingEnabled(rejectHosts[i], true);
+        Services.logins.setLoginSavingEnabled(rejectHosts[i], true);
       }
     }
     gDomains.removeDomainOrFlag(gDomains.selectedDomain.title, "hasPermissions");
@@ -1940,7 +1946,7 @@ var gPasswords = {
   },
 
   loadList: function passwords_loadList() {
-    this.allSignons = gLocSvc.pwd.getAllLogins();
+    this.allSignons = Services.logins.getAllLogins();
   },
 
   _getObjID: function passwords__getObjID(aIdx) {
@@ -2045,7 +2051,7 @@ var gPasswords = {
       this.allSignons.splice(this.allSignons.indexOf(this.displayedSignons[selections[i]]), 1);
       this.displayedSignons.splice(selections[i], 1);
       this.tree.treeBoxObject.rowCountChanged(selections[i], -1);
-      gLocSvc.pwd.removeLogin(delSignon);
+      Services.logins.removeLogin(delSignon);
     }
     if (!this.displayedSignons.length)
       gDomains.removeDomainOrFlag(gDomains.selectedDomain.title, "hasPasswords");
@@ -2230,7 +2236,7 @@ var gPasswords = {
         // Remove from internal list needs to be before actually deleting.
         let delSignon = this.allSignons[i];
         this.allSignons.splice(i, 1);
-        gLocSvc.pwd.removeLogin(delSignon);
+        Services.logins.removeLogin(delSignon);
       }
     }
     gDomains.removeDomainOrFlag(gDomains.selectedDomain.title, "hasPasswords");
