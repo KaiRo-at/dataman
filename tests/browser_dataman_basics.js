@@ -243,7 +243,7 @@ function test_fdata_panel(aWin) {
      "value0,value2,value3",
      "After sort, correct items are selected");
 
-   // Select only one for testing remove button, as catching the prompt is hard.
+  // Select only one for testing remove button, as catching the prompt is hard.
   aWin.gFormdata.tree.view.selection.select(5);
   aWin.document.getElementById("fdataRemove").click();
   is(aWin.gFormdata.tree.view.rowCount, 5,
@@ -734,50 +734,71 @@ function test_idn(aWin) {
   Services.obs.notifyObservers(window, TEST_DONE, null);
 },
 
-function test_storage(aWin) {
-  Services.perms.add(Services.io.newURI("chrome://mochitests/content/browser/", null, null),
+function test_storage_load(aWin) {
+  // Load the page that fills in several web storage entries.
+  Services.perms.add(Services.io.newURI("http://mochi.test:8888/", null, null),
                      "offline-app", Services.perms.ALLOW_ACTION);
-  Services.perms.add(Services.io.newURI("chrome://mochitests/content/browser/", null, null),
+  Services.perms.add(Services.io.newURI("http://mochi.test:8888/", null, null),
                      "indexedDB", Services.perms.ALLOW_ACTION);
 
-  let rootDir = getRootDirectory(gTestPath);
+  let rootDir = "http://mochi.test:8888/browser/extensions/dataman/tests/";
   let testURL = rootDir + "dataman_storage.html";
   let storagetab = gBrowser.addTab(testURL);
-  function dmStorageOpenListener() {
-    storagetab.removeEventListener("load", dmStorageOpenListener, false);
-    aWin.gStorage.reloadList();
-    aWin.gDomains.tree.view.selection.select(9);
-    is(aWin.gDomains.selectedDomain.title, "mochitests",
-      "For storage tests, correct domain is selected");
-    is(aWin.document.getElementById("storageTab").disabled, false,
-      "Storage panel is enabled");
-    aWin.gTabs.tabbox.selectedTab = aWin.document.getElementById("storageTab");
-    is(aWin.gTabs.activePanel, "storagePanel",
-      "Storage panel is selected");
-    is(aWin.gStorage.tree.view.rowCount, 3,
-       "The correct number of storages is listed");
+  let stWin = storagetab.linkedBrowser.contentWindow.wrappedJSObject;
+  let dmStorageListener = {
+    handleEvent: function dmStorageHandler(aEvent) {
+      let tab = aEvent.target;
+      if (tab == storagetab) {
+        gBrowser.tabContainer.removeEventListener("TabClose", this, false);
+        // Force DOM Storage to write its data to the disk.
+        Services.obs.notifyObservers(null, "domstorage-flush-timer", "");
+        Services.perms.remove("mochi.test", "offline-app");
+        Services.perms.remove("mochi.test", "indexedDB");
+        Services.obs.notifyObservers(window, TEST_DONE, null);
+      }
+    },
+  };
+  gBrowser.tabContainer.addEventListener("TabClose", dmStorageListener, false);
+},
 
-    aWin.document.getElementById("domain-context-forget").click();
-    is(aWin.gTabs.activePanel, "forgetPanel",
-      "Forget panel is selected");
+function test_storage_wait(aWin) {
+  // Wait to make sure that DOM Storage flushing has actually worked.
+  setTimeout(function foo() {
+      Services.obs.notifyObservers(window, TEST_DONE, null); }, 1000);
+},
 
-    aWin.document.getElementById("forgetPermissions").click();
-    aWin.document.getElementById("forgetStorage").click();
-    aWin.document.getElementById("forgetButton").click();
-    is(aWin.document.getElementById("forgetTab").hidden, true,
-      "Forget tab is hidden again");
-    is(aWin.document.getElementById("forgetTab").disabled, true,
-      "Forget panel is disabled again");
+function test_storage(aWin) {
+  aWin.gStorage.reloadList();
+  info("appcache groups: " + aWin.gLocSvc.appcache.getGroups().length);
+  aWin.gDomains.tree.view.selection.select(8);
+  is(aWin.gDomains.selectedDomain.title, "mochi.test",
+    "For storage tests, correct domain is selected");
+  is(aWin.document.getElementById("storageTab").disabled, false,
+    "Storage panel is enabled");
+  aWin.gTabs.tabbox.selectedTab = aWin.document.getElementById("storageTab");
+  is(aWin.gTabs.activePanel, "storagePanel",
+    "Storage panel is selected");
+  is(aWin.gStorage.tree.view.rowCount, 3,
+    "The correct number of storages is listed");
+  is(aWin.gStorage.displayedStorages
+         .map(function(aStorage) { return aStorage.type; })
+         .sort().join(","),
+      "appCache,indexedDB,localStorage",
+      "The correct types of storage are listed");
 
-    is(aWin.gDomains.tree.view.rowCount, gPreexistingDomains + 4,
-      "The storage domain has been removed from the list");
-    is(aWin.gDomains.tree.view.selection.count, 0,
-      "No domain is selected");
-
-    gBrowser.removeTab(storagetab);
-    Services.obs.notifyObservers(window, TEST_DONE, null);
+  for (let i = aWin.gStorage.tree.view.rowCount - 1; i >= 0; i--) {
+    let remType = aWin.gStorage.displayedStorages[0].type;
+    info("Removing " + remType);
+    aWin.gStorage.tree.view.selection.select(0);
+    aWin.document.getElementById("storageRemove").click();
+    is(aWin.gStorage.tree.view.rowCount, i,
+      remType + " entry removed");
   }
-  storagetab.addEventListener("load", dmStorageOpenListener, false);
+
+  isnot(aWin.gTabs.activePanel, "storagePanel",
+    "Storage panel is not selected any more");
+
+  Services.obs.notifyObservers(window, TEST_DONE, null);
 },
 
 function test_close(aWin) {

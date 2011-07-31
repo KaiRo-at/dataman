@@ -399,6 +399,9 @@ var gDomains = {
 
       // Add domains for web storages.
       gDataman.debugMsg("Add storages to domain list: " + Date.now()/1000);
+      // Force DOM Storage to write its data to the disk.
+      Services.obs.notifyObservers(window, "domstorage-flush-timer", "");
+      yield setTimeout(nextStep, 0);
       gStorage.loadList();
       for (let i = 0; i < gStorage.storages.length; i++) {
         gDomains.addDomainOrFlag(gStorage.storages[i].rawHost, "hasStorage");
@@ -527,18 +530,18 @@ var gDomains = {
       // URI-like, e.g. gopher://example.com and newURI doesn't work there as we
       // need to display entries for schemes that are not supported (any more).
       // nsIURLParser is a fast way to generically ensure a pure host name.
+      var hostName;
       // Return vars for nsIURLParser must all be objects,
       // see bug 568997 for improvements to that interface.
-      var hostName;
+      var schemePos = {}, schemeLen = {}, authPos = {}, authLen = {}, pathPos = {},
+          pathLen = {}, usernamePos = {}, usernameLen = {}, passwordPos = {},
+          passwordLen = {}, hostnamePos = {}, hostnameLen = {}, port = {};
       try {
-        var schemePos = {}, schemeLen = {}, authPos = {}, authLen = {}, pathPos = {},
-            pathLen = {}, usernamePos = {}, usernameLen = {}, passwordPos = {},
-            passwordLen = {}, hostnamePos = {}, hostnameLen = {}, port = {};
         gLocSvc.url.parseURL(aHostname, -1, schemePos, schemeLen, authPos, authLen,
-                            pathPos, pathLen);
+                             pathPos, pathLen);
         var auth = aHostname.substring(authPos.value, authPos.value + authLen.value);
         gLocSvc.url.parseAuthority(auth, authLen.value, usernamePos, usernameLen,
-                                  passwordPos, passwordLen, hostnamePos, hostnameLen, port);
+                                   passwordPos, passwordLen, hostnamePos, hostnameLen, port);
         hostName = auth.substring(hostnamePos.value, hostnamePos.value + hostnameLen.value);
       }
       catch (e) {
@@ -2373,9 +2376,10 @@ var gStorage = {
                         .get("ProfD", Components.interfaces.nsIFile);
     dir.append("indexedDB");
     if (dir.exists() && dir.isDirectory()) {
-      // Enumerate subdir entries, names are like "http+++davidflanagan.com",
-      // and filter out the domain name and protocol from that.
-      // gLocSvc.idxdbmgr works as soon as we have a URI.
+      // Enumerate subdir entries, names are like "http+++davidflanagan.com" or
+      // "https+++mochi.test+8888", and filter out the domain name and protocol
+      // from that.
+      // gLocSvc.idxdbmgr is usable as soon as we have a URI.
       let files = dir.directoryEntries
                      .QueryInterface(Components.interfaces.nsIDirectoryEnumerator);
       gDataman.debugMsg("Loading IndexedDB entries");
@@ -2383,7 +2387,7 @@ var gStorage = {
       while (files.hasMoreElements()) {
         let file = files.nextFile;
         // Convert directory name to a URI.
-        let host = file.leafName.replace(/\+\+\+/, "://");
+        let host = file.leafName.replace(/\+\+\+/, "://").replace(/\+(\d+)$/, ":$1");
         let uri = Services.io.newURI(host, null, null);
         this.storages.push({host: host,
                             rawHost: uri.host,
