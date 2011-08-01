@@ -1413,9 +1413,12 @@ var gPerms = {
         if (Services.prefs.getBoolPref("xpinstall.whitelist.required"))
           return Services.perms.DENY_ACTION;
         return Services.perms.ALLOW_ACTION;
-      case "offline-apps":
-        if (Services.prefs.getBoolPref("offline-apps.allow_by_default"))
-          return Services.perms.ALLOW_ACTION;
+      case "offline-app":
+        try {
+          if (Services.prefs.getBoolPref("offline-apps.allow_by_default"))
+            return Services.perms.ALLOW_ACTION;
+        }
+        catch (e) {}
         return Services.perms.DENY_ACTION;
       case "password":
         return Services.perms.ALLOW_ACTION;

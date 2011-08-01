@@ -328,8 +328,12 @@ function test_permissions_panel(aWin) {
                      "geo", Services.perms.ALLOW_ACTION);
   Services.perms.add(Services.io.newURI("http://image.getpersonas.com/", null, null),
                      "image", Services.perms.DENY_ACTION);
+  Services.perms.add(Services.io.newURI("http://indexedDB.getpersonas.com/", null, null),
+                     "indexedDB", Services.perms.ALLOW_ACTION);
   Services.perms.add(Services.io.newURI("http://install.getpersonas.com/", null, null),
                      "install", Services.perms.ALLOW_ACTION);
+  Services.perms.add(Services.io.newURI("http://offline.getpersonas.com/", null, null),
+                     "offline-app", Services.perms.ALLOW_ACTION);
   Services.perms.add(Services.io.newURI("http://popup.getpersonas.com/", null, null),
                      "popup", Services.perms.ALLOW_ACTION);
   Services.perms.add(Services.io.newURI("http://test.getpersonas.com/", null, null),
@@ -337,7 +341,7 @@ function test_permissions_panel(aWin) {
   Services.perms.add(Services.io.newURI("http://xul.getpersonas.com/", null, null),
                      "allowXULXBL", Services.perms.ALLOW_ACTION);
   Services.logins.setLoginSavingEnabled("password.getpersonas.com", false);
-  is(aWin.gPerms.list.children.length, 10,
+  is(aWin.gPerms.list.children.length, 12,
      "The correct number of permissions is displayed in the list");
   for (let i = 1; i < aWin.gPerms.list.children.length; i++) {
     let perm = aWin.gPerms.list.children[i];
@@ -378,8 +382,26 @@ function test_permissions_panel(aWin) {
         is(perm.capability, 1,
            "Set back to correct default");
         break;
+      case "indexedDB":
+        is(perm.getAttribute("label"), "Store Local Databases",
+           "Correct label for type: " + perm.type);
+        is(perm.capability, 1,
+           "Correct capability for: " + perm.host);
+        perm.useDefault(true);
+        is(perm.capability, 2,
+           "Set back to correct default");
+        break;
       case "install":
         is(perm.getAttribute("label"), "Install Add-ons",
+           "Correct label for type: " + perm.type);
+        is(perm.capability, 1,
+           "Correct capability for: " + perm.host);
+        perm.useDefault(true);
+        is(perm.capability, 2,
+           "Set back to correct default");
+        break;
+      case "offline-app":
+        is(perm.getAttribute("label"), "Store Data for Offline Use",
            "Correct label for type: " + perm.type);
         is(perm.capability, 1,
            "Correct capability for: " + perm.host);
