@@ -2128,10 +2128,23 @@ var gPasswords = {
   },
 
   copyPassword: function passwords_copyPassword() {
-    // Copy selected signon's password to clipboard.
-    let row = this.tree.currentIndex;
-    let password = gPasswords.displayedSignons[row].password;
-    gLocSvc.clipboard.copyString(password);
+    // Prompt for the master password upfront.
+    let token = Components.classes["@mozilla.org/security/pk11tokendb;1"]
+                          .getService(Components.interfaces.nsIPK11TokenDB)
+                          .getInternalKeyToken();
+
+    try {
+      if (!token.needsUserInit) {
+        token.login(true);
+        // Copy selected signon's password to clipboard.
+        let row = this.tree.currentIndex;
+        let password = gPasswords.displayedSignons[row].password;
+        gLocSvc.clipboard.copyString(password);
+      }
+    }
+    catch (ex) {
+      // If user cancels an exception is expected.
+    }
   },
 
   reactToChange: function passwords_reactToChange(aSubject, aData) {
