@@ -17,16 +17,16 @@ var gLocSvc = {
 const DATAMAN_LOADED = "dataman-loaded";
 const TEST_DONE = "dataman-test-done";
 
-var gPreexistingDomains = 10;
+const kPreexistingDomains = 12;
 
 function test() {
   // Preload data.
   // Note that before this test starts, what is already set are permissions for
   // getpersonas.com and addons.mozilla.org to install addons as well as
   // permissions for a number of sites used in mochitest to load XUL/XBL.
-  // For the latter, those domains are used/listed: 172.0.0.1, bank1.com,
+  // For the latter, those 12 domains are used/listed: 127.0.0.1, bank1.com,
   // bank2.com, example.com, example.org, mochi.test, mozilla.com, test,
-  // xn--exmple-cua.test, xn--hxajbheg2az3al.xn--jxalpdlp
+  // w3.org, w3c-test.org, xn--exmple-cua.test, xn--hxajbheg2az3al.xn--jxalpdlp
   // We should not touch those permissions so other tests can run, which means
   // we should avoid using those domains altogether as we can't remove them.
 
@@ -120,7 +120,7 @@ var testFuncs = [
 function test_open_state(aWin) {
   is(aWin.document.documentElement.id, "dataman-page",
      "The active tab is the Data Manager");
-  is(aWin.gDomains.tree.view.rowCount, gPreexistingDomains + 6,
+  is(aWin.gDomains.tree.view.rowCount, kPreexistingDomains + 6,
      "The correct number of domains is listed");
   is(aWin.gTabs.activePanel, "formdataPanel",
      "Form data panel is selected");
@@ -139,7 +139,7 @@ function test_open_state(aWin) {
   aWin.gDomains.tree.view.selection.select(0);
   aWin.document.getElementById("domainSearch").value = "";
   aWin.document.getElementById("domainSearch").doCommand();
-  is(aWin.gDomains.tree.view.rowCount, gPreexistingDomains + 6,
+  is(aWin.gDomains.tree.view.rowCount, kPreexistingDomains + 6,
      "After search, the correct number of domains is listed");
   is(aWin.gDomains.tree.view.selection.count, 1,
      "After search, number of selections is correct");
@@ -166,7 +166,7 @@ function test_forget_ipv6(aWin) {
   is(aWin.document.getElementById("forgetTab").disabled, true,
      "Forget panel is disabled again");
 
-  is(aWin.gDomains.tree.view.rowCount, gPreexistingDomains + 5,
+  is(aWin.gDomains.tree.view.rowCount, kPreexistingDomains + 5,
      "The IPv6 domain has been removed from the list");
   is(aWin.gDomains.tree.view.selection.count, 0,
      "No domain is selected");
@@ -305,7 +305,7 @@ function test_cookies_panel(aWin) {
      "After selecting, the remove context menu item is enabled");
 
   aWin.document.getElementById("cookies-context-remove").click();
-  is(aWin.gDomains.tree.view.rowCount, gPreexistingDomains + 4,
+  is(aWin.gDomains.tree.view.rowCount, kPreexistingDomains + 4,
      "The domain has been removed from the list");
   is(aWin.gTabs.activePanel, null,
      "No panel is active");
@@ -324,6 +324,8 @@ function test_permissions_panel(aWin) {
                      "cookie", Components.interfaces.nsICookiePermission.ACCESS_SESSION);
   Services.perms.add(Services.io.newURI("http://cookie2.getpersonas.com/", null, null),
                      "cookie", Services.perms.DENY_ACTION);
+  Services.perms.add(Services.io.newURI("http://xul.getpersonas.com/", null, null),
+                     "allowXULXBL", Services.perms.ALLOW_ACTION);
   Services.perms.add(Services.io.newURI("http://geo.getpersonas.com/", null, null),
                      "geo", Services.perms.ALLOW_ACTION);
   Services.perms.add(Services.io.newURI("http://image.getpersonas.com/", null, null),
@@ -332,14 +334,22 @@ function test_permissions_panel(aWin) {
                      "indexedDB", Services.perms.ALLOW_ACTION);
   Services.perms.add(Services.io.newURI("http://install.getpersonas.com/", null, null),
                      "install", Services.perms.ALLOW_ACTION);
+  Services.perms.add(Services.io.newURI("http://object.getpersonas.com/", null, null),
+                     "object", Services.perms.ALLOW_ACTION);
   Services.perms.add(Services.io.newURI("http://offline.getpersonas.com/", null, null),
                      "offline-app", Services.perms.ALLOW_ACTION);
+  Services.perms.add(Services.io.newURI("http://password.getpersonas.com/", null, null),
+                     "password", Services.perms.ALLOW_ACTION);
+  Services.perms.add(Services.io.newURI("http://plugins.getpersonas.com/", null, null),
+                     "plugins", Services.perms.ALLOW_ACTION);
   Services.perms.add(Services.io.newURI("http://popup.getpersonas.com/", null, null),
                      "popup", Services.perms.ALLOW_ACTION);
+  Services.perms.add(Services.io.newURI("http://script.getpersonas.com/", null, null),
+                     "script", Services.perms.ALLOW_ACTION);
+  Services.perms.add(Services.io.newURI("http://stylesheet.getpersonas.com/", null, null),
+                     "stylesheet", Services.perms.ALLOW_ACTION);
   Services.perms.add(Services.io.newURI("http://test.getpersonas.com/", null, null),
                      "test", Services.perms.DENY_ACTION);
-  Services.perms.add(Services.io.newURI("http://xul.getpersonas.com/", null, null),
-                     "allowXULXBL", Services.perms.ALLOW_ACTION);
   Services.logins.setLoginSavingEnabled("password.getpersonas.com", false);
   is(aWin.gPerms.list.children.length, 12,
      "The correct number of permissions is displayed in the list");
@@ -400,6 +410,15 @@ function test_permissions_panel(aWin) {
         is(perm.capability, 2,
            "Set back to correct default");
         break;
+      case "object":
+        is(perm.getAttribute("label"), "Save Passwords",
+           "Correct label for type: " + perm.type);
+        is(perm.capability, 2,
+           "Correct capability for: " + perm.host);
+        perm.useDefault(true);
+        is(perm.capability, 1,
+           "Set back to correct default");
+        break;
       case "offline-app":
         is(perm.getAttribute("label"), "Store Data for Offline Use",
            "Correct label for type: " + perm.type);
@@ -418,7 +437,34 @@ function test_permissions_panel(aWin) {
         is(perm.capability, 1,
            "Set back to correct default");
         break;
+      case "plugins":
+        is(perm.getAttribute("label"), "Open Popup Windows",
+           "Correct label for type: " + perm.type);
+        is(perm.capability, 1,
+           "Correct capability for: " + perm.host);
+        perm.useDefault(true);
+        is(perm.capability, 1,
+           "Set back to correct default");
+        break;
       case "popup":
+        is(perm.getAttribute("label"), "Open Popup Windows",
+           "Correct label for type: " + perm.type);
+        is(perm.capability, 1,
+           "Correct capability for: " + perm.host);
+        perm.useDefault(true);
+        is(perm.capability, 1,
+           "Set back to correct default");
+        break;
+      case "script":
+        is(perm.getAttribute("label"), "Open Popup Windows",
+           "Correct label for type: " + perm.type);
+        is(perm.capability, 1,
+           "Correct capability for: " + perm.host);
+        perm.useDefault(true);
+        is(perm.capability, 1,
+           "Set back to correct default");
+        break;
+      case "stylesheet":
         is(perm.getAttribute("label"), "Open Popup Windows",
            "Correct label for type: " + perm.type);
         is(perm.capability, 1,
@@ -518,7 +564,7 @@ function test_permissions_add(aWin) {
 function test_prefs_panel(aWin) {
   Services.contentPrefs.setPref("my.drumbeat.org", "data_manager.test", "foo");
   Services.contentPrefs.setPref("drumbeat.org", "data_manager.test", "bar");
-  is(aWin.gDomains.tree.view.rowCount, gPreexistingDomains + 5,
+  is(aWin.gDomains.tree.view.rowCount, kPreexistingDomains + 5,
      "The domain for prefs tests has been added from the list");
   aWin.gDomains.tree.view.selection.select(4);
   is(aWin.gDomains.selectedDomain.title, "drumbeat.org",
@@ -583,7 +629,7 @@ function test_prefs_panel(aWin) {
   is(aWin.document.getElementById("forgetTab").disabled, true,
      "Forget panel is disabled again");
 
-  is(aWin.gDomains.tree.view.rowCount, gPreexistingDomains + 4,
+  is(aWin.gDomains.tree.view.rowCount, kPreexistingDomains + 4,
      "The domain for prefs tests has been removed from the list");
   is(aWin.gDomains.tree.view.selection.count, 0,
      "No domain is selected");
@@ -692,7 +738,7 @@ function test_idn(aWin) {
   aWin.document.getElementById("domainSearch").value = "";
   aWin.document.getElementById("domainSearch").doCommand();
 
-  aWin.gDomains.tree.view.selection.select(gPreexistingDomains + 3);
+  aWin.gDomains.tree.view.selection.select(kPreexistingDomains + 3);
   is(aWin.gDomains.selectedDomain.title, testDomain,
      "For IDN tests, correct domain is selected");
   is(aWin.gDomains.selectedDomain.displayTitle, idnDomain,
