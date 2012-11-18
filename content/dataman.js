@@ -2399,13 +2399,6 @@ var gStorage = {
     }
   },
 
-  shutdown: function storage_shutdown() {
-    gDataman.debugMsg("Shutting down storage panel");
-    this.tree.view.selection.clearSelection();
-    this.tree.view = null;
-    this.displayedStorages = [];
-  },
-
   _getObjID: function storage__getObjID(aIdx) {
     var curStorage = gStorage.displayedStorages[aIdx];
     return curStorage.host + "|" + curStorage.type;
