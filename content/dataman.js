@@ -283,7 +283,7 @@ var gDomains = {
     this.domainObjects["*"] = {title: "*",
                                displayTitle: "*",
                                hasPermissions: true,
-                               hasPreferences: Services.contentPrefs.getPrefs(null).enumerator.hasMoreElements(),
+                               hasPreferences: Services.contentPrefs.getPrefs(null, null).enumerator.hasMoreElements(),
                                hasFormData: true};
     this.search("");
     if (!gDataman.viewToLoad.length)
@@ -1578,7 +1578,7 @@ var gPrefs = {
     // Get all groups (hosts) that match the domain.
     let domain = gDomains.selectedDomain.title;
     if (domain == "*") {
-      let enumerator = Services.contentPrefs.getPrefs(null).enumerator;
+      let enumerator = Services.contentPrefs.getPrefs(null, null).enumerator;
       while (enumerator.hasMoreElements()) {
         let pref = enumerator.getNext().QueryInterface(Components.interfaces.nsIProperty);
         this.prefs.push({host: null, name: pref.name, value: pref.value});
@@ -1598,7 +1598,7 @@ var gPrefs = {
         statement.params.hostIDNMatch = "%." + statement.escapeStringForLIKE(idnDomain, "/");
         while (statement.executeStep()) {
           // Now, get all prefs for that host.
-          let enumerator =  Services.contentPrefs.getPrefs(statement.row["host"]).enumerator;
+          let enumerator =  Services.contentPrefs.getPrefs(statement.row["host"], null).enumerator;
           while (enumerator.hasMoreElements()) {
             let pref = enumerator.getNext().QueryInterface(Components.interfaces.nsIProperty);
             this.prefs.push({host: statement.row["host"],
@@ -1724,7 +1724,7 @@ var gPrefs = {
       let delPref = this.prefs[selections[i]];
       this.prefs.splice(selections[i], 1);
       this.tree.treeBoxObject.rowCountChanged(selections[i], -1);
-      Services.contentPrefs.removePref(delPref.host, delPref.name);
+      Services.contentPrefs.removePref(delPref.host, delPref.name, null);
     }
     if (!this.prefs.length)
       gDomains.removeDomainOrFlag(gDomains.selectedDomain.title, "hasPreferences");
@@ -1765,7 +1765,7 @@ var gPrefs = {
     else if (aData == "prefRemoved") {
       // See if there are any prefs left for that domain.
       if (domain == "*") {
-        let enumerator = Services.contentPrefs.getPrefs(null).enumerator;
+        let enumerator = Services.contentPrefs.getPrefs(null, null).enumerator;
         if (enumerator.hasMoreElements())
           domainPrefs++;
       }
@@ -1777,7 +1777,7 @@ var gPrefs = {
           statement.params.hostMatch = "%." + statement.escapeStringForLIKE(domain, "/");
           while (statement.executeStep()) {
             // Now, get all prefs for that host.
-            let enumerator = Services.contentPrefs.getPrefs(statement.row["host"]).enumerator;
+            let enumerator = Services.contentPrefs.getPrefs(statement.row["host"], null).enumerator;
             if (enumerator.hasMoreElements())
               domainPrefs++;
           }
@@ -1825,7 +1825,7 @@ var gPrefs = {
       // Get all groups (hosts) that match the domain.
       let domain = gDomains.selectedDomain.title;
       if (domain == "*") {
-        let enumerator =  Services.contentPrefs.getPrefs(null).enumerator;
+        let enumerator =  Services.contentPrefs.getPrefs(null, null).enumerator;
         while (enumerator.hasMoreElements()) {
           let pref = enumerator.getNext().QueryInterface(Components.interfaces.nsIProperty);
           delPrefs.push({host: null, name: pref.name, value: pref.value});
@@ -1838,7 +1838,7 @@ var gPrefs = {
         statement.params.hostMatch = "%." + statement.escapeStringForLIKE(domain, "/");
         while (statement.executeStep()) {
           // Now, get all prefs for that host.
-          let enumerator =  Services.contentPrefs.getPrefs(statement.row["host"]).enumerator;
+          let enumerator =  Services.contentPrefs.getPrefs(statement.row["host"], null).enumerator;
           while (enumerator.hasMoreElements()) {
             let pref = enumerator.getNext().QueryInterface(Components.interfaces.nsIProperty);
             delPrefs.push({host: statement.row["host"], name: pref.name, value: pref.value});
@@ -1850,7 +1850,7 @@ var gPrefs = {
       statement.reset();
     }
     for (let i = 0; i < delPrefs.length; i++) {
-      Services.contentPrefs.removePref(delPrefs[i].host, delPrefs[i].name);
+      Services.contentPrefs.removePref(delPrefs[i].host, delPrefs[i].name, null);
     }
     gDomains.removeDomainOrFlag(gDomains.selectedDomain.title, "hasPreferences");
   },
