@@ -164,7 +164,6 @@ var gDataman = {
       case "satchel-storage-changed":
         gFormdata.reactToChange(aSubject, aData);
         break;
-      case "dom-storage-changed": // globalStorage
       case "dom-storage2-changed": // sessionStorage, localStorage
         gStorage.reactToChange(aSubject, aData);
         break;
@@ -2324,11 +2323,11 @@ var gStorage = {
       }
     }
     gDataman.debugMsg("Loading " + domstorelist.length + " DOM Storage entries");
-    // Scopes are reversed, e.g. |moc.elgoog.www.:http:80| (localStorage) or |gro.allizom.| (globalStorage).
+    // Scopes are reversed, e.g. |moc.elgoog.www.:http:80| (for localStorage).
     for (let i = 0; i < domstorelist.length; i++) {
       // Get the host from the reversed scope.
       let scopeparts = domstorelist[i].scope.split(":");
-      let host = "", origHost = "", type = "globalStorage";
+      let host = "", origHost = "", type = "unknown";
       for (let c = 0; c < scopeparts[0].length; c++) {
         origHost = scopeparts[0].charAt(c) + origHost;
       }
@@ -2344,22 +2343,25 @@ var gStorage = {
           host = host + ":" + scopeparts[2];
         }
       }
-      // Merge entries for one scope into a single entry if possible.
-      let scopefound = false;
-      for (let i = 0; i < this.storages.length; i++) {
-        if (this.storages[i].type == type && this.storages[i].host == host) {
-          this.storages[i].keys.push(domstorelist[i].key);
-          scopefound = true;
-          break;
+      // Make sure we only add known/supported types
+      if (type != "unknown") {
+        // Merge entries for one scope into a single entry if possible.
+        let scopefound = false;
+        for (let i = 0; i < this.storages.length; i++) {
+          if (this.storages[i].type == type && this.storages[i].host == host) {
+            this.storages[i].keys.push(domstorelist[i].key);
+            scopefound = true;
+            break;
+          }
         }
-      }
-      if (!scopefound) {
-        this.storages.push({host: host,
-                            rawHost: rawHost,
-                            type: type,
-                            size: gLocSvc.domstoremgr.getUsage(rawHost),
-                            origHost: origHost,
-                            keys: [domstorelist[i].key]});
+        if (!scopefound) {
+          this.storages.push({host: host,
+                              rawHost: rawHost,
+                              type: type,
+                              size: gLocSvc.domstoremgr.getUsage(rawHost),
+                              origHost: origHost,
+                              keys: [domstorelist[i].key]});
+        }
       }
     }
 
@@ -2496,8 +2498,6 @@ var gStorage = {
     // Loop backwards so later indexes in the list don't change.
     for (let i = selections.length - 1; i >= 0; i--) {
       let delStorage = this.displayedStorages[selections[i]];
-      if (delStorage.type == "globalStorage") // TODO: No idea how to remove this.
-        break;
       this.storages.splice(
           this.storages.indexOf(this.displayedStorages[selections[i]]), 1);
       this.displayedStorages.splice(selections[i], 1);
@@ -2518,8 +2518,6 @@ var gStorage = {
     switch (aStorageItem.type) {
       case "appCache":
         gLocSvc.appcache.getActiveCache(aStorageItem.groupID).discard();
-        break;
-      case "globalStorage": // TODO: No idea how to do remove this.
         break;
       case "localStorage":
         let testHost = aStorageItem.host;
@@ -2578,7 +2576,6 @@ var gStorage = {
 
   reactToChange: function storage_reactToChange(aSubject, aData) {
     // aData: null (sessionStorage, localStorage) + nsIDOMStorageEvent in aSubject
-    //        domain name (globalStorage) + nsIDOMStorageObsolete in aSubject
     //        --- for appCache and indexedDB, no change notifications are known!
     //        --- because of that, we don't do anything here and instead use
     //            reloadList periodically
@@ -2588,10 +2585,6 @@ var gStorage = {
       // session storage also comes here, but currently not supported
       // aData: null, all data in aSubject
       // see https://developer.mozilla.org/en/DOM/Event/StorageEvent
-    }
-    else if (aSubject instanceof Components.interfaces.nsIDOMStorageObsolete) {
-      type = "globalStorage";
-      // aData: domain name
     }
     else {
       Components.utils.reportError("Observed an unrecognized storage change of type " + aData);

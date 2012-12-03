@@ -48,3 +48,6 @@ libs::
 	rm -rf $(ABS_DIST)/extensions/$(INSTALL_EXTENSION_ID); \
 	fi
 endif
+
+runtests:
+	python $(DEPTH)/_tests/testing/mochitest/runtests.py --browser-chrome --setpref=extensions.autoDisableScopes=0  --autorun --close-when-done  --console-level=INFO  --test-path=extensions/dataman
