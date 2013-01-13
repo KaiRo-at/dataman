@@ -338,20 +338,18 @@ function test_permissions_panel(aWin) {
                      "object", Services.perms.ALLOW_ACTION);
   Services.perms.add(Services.io.newURI("http://offline.getpersonas.com/", null, null),
                      "offline-app", Services.perms.ALLOW_ACTION);
-  Services.perms.add(Services.io.newURI("http://password.getpersonas.com/", null, null),
-                     "password", Services.perms.ALLOW_ACTION);
   Services.perms.add(Services.io.newURI("http://plugins.getpersonas.com/", null, null),
-                     "plugins", Services.perms.ALLOW_ACTION);
+                     "plugins", Services.perms.DENY_ACTION);
   Services.perms.add(Services.io.newURI("http://popup.getpersonas.com/", null, null),
-                     "popup", Services.perms.ALLOW_ACTION);
+                     "popup", Services.perms.DENY_ACTION);
   Services.perms.add(Services.io.newURI("http://script.getpersonas.com/", null, null),
                      "script", Services.perms.ALLOW_ACTION);
   Services.perms.add(Services.io.newURI("http://stylesheet.getpersonas.com/", null, null),
-                     "stylesheet", Services.perms.ALLOW_ACTION);
+                     "stylesheet", Services.perms.DENY_ACTION);
   Services.perms.add(Services.io.newURI("http://test.getpersonas.com/", null, null),
                      "test", Services.perms.DENY_ACTION);
   Services.logins.setLoginSavingEnabled("password.getpersonas.com", false);
-  is(aWin.gPerms.list.children.length, 12,
+  is(aWin.gPerms.list.children.length, 16,
      "The correct number of permissions is displayed in the list");
   for (let i = 1; i < aWin.gPerms.list.children.length; i++) {
     let perm = aWin.gPerms.list.children[i];
@@ -411,12 +409,12 @@ function test_permissions_panel(aWin) {
            "Set back to correct default");
         break;
       case "object":
-        is(perm.getAttribute("label"), "Save Passwords",
+        is(perm.getAttribute("label"), "Run Plugins",
            "Correct label for type: " + perm.type);
-        is(perm.capability, 2,
+        is(perm.capability, 1,
            "Correct capability for: " + perm.host);
         perm.useDefault(true);
-        is(perm.capability, 1,
+        is(perm.capability, 0,
            "Set back to correct default");
         break;
       case "offline-app":
@@ -438,9 +436,9 @@ function test_permissions_panel(aWin) {
            "Set back to correct default");
         break;
       case "plugins":
-        is(perm.getAttribute("label"), "Open Popup Windows",
+        is(perm.getAttribute("label"), "Activate Plugins",
            "Correct label for type: " + perm.type);
-        is(perm.capability, 1,
+        is(perm.capability, 2,
            "Correct capability for: " + perm.host);
         perm.useDefault(true);
         is(perm.capability, 1,
@@ -449,28 +447,28 @@ function test_permissions_panel(aWin) {
       case "popup":
         is(perm.getAttribute("label"), "Open Popup Windows",
            "Correct label for type: " + perm.type);
-        is(perm.capability, 1,
+        is(perm.capability, 2,
            "Correct capability for: " + perm.host);
         perm.useDefault(true);
         is(perm.capability, 1,
            "Set back to correct default");
         break;
       case "script":
-        is(perm.getAttribute("label"), "Open Popup Windows",
+        is(perm.getAttribute("label"), "Run Scripts",
            "Correct label for type: " + perm.type);
         is(perm.capability, 1,
            "Correct capability for: " + perm.host);
         perm.useDefault(true);
-        is(perm.capability, 1,
+        is(perm.capability, 0,
            "Set back to correct default");
         break;
       case "stylesheet":
-        is(perm.getAttribute("label"), "Open Popup Windows",
+        is(perm.getAttribute("label"), "Load Stylesheets",
            "Correct label for type: " + perm.type);
-        is(perm.capability, 1,
+        is(perm.capability, 2,
            "Correct capability for: " + perm.host);
         perm.useDefault(true);
-        is(perm.capability, 1,
+        is(perm.capability, 0,
            "Set back to correct default");
         break;
       default:
@@ -802,8 +800,6 @@ function test_storage_load(aWin) {
   // Load the page that fills in several web storage entries.
   Services.perms.add(Services.io.newURI("http://mochi.test:8888/", null, null),
                      "offline-app", Services.perms.ALLOW_ACTION);
-  Services.perms.add(Services.io.newURI("http://mochi.test:8888/", null, null),
-                     "indexedDB", Services.perms.ALLOW_ACTION);
 
   let rootDir = "http://mochi.test:8888/browser/extensions/dataman/tests/";
   let testURL = rootDir + "dataman_storage.html";
@@ -817,7 +813,6 @@ function test_storage_load(aWin) {
         // Force DOM Storage to write its data to the disk.
         Services.obs.notifyObservers(null, "domstorage-flush-timer", "");
         Services.perms.remove("mochi.test", "offline-app");
-        Services.perms.remove("mochi.test", "indexedDB");
         Services.obs.notifyObservers(window, TEST_DONE, null);
       }
     },

@@ -23,11 +23,6 @@ localStorage.setItem("localtest", "foo"); // issues no storage event (!?)
 
 var request = indexedDB.open("test");
 request.onsuccess = function(e) {
-  var db = request.result;
-  var store = db.createObjectStore("test", {keyPath: "foo"});
-  db.transaction(["test"], IDBTransaction.READ_WRITE, 0)
-    .objectStore("test").put({"foo": "bar"});
-  // create, define and dispatch the test-done event
   var event = document.createEvent('Event');
   event.initEvent('idb-done', true, true);
   document.dispatchEvent(event);
