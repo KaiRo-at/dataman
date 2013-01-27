@@ -22,4 +22,11 @@
               insertafter="menu_openAddons"/>
   </menupopup>
 
+  <vbox id="appmenuSecondaryPane">
+    <menuitem id="appmenu_openDataman" class="menuitem-iconic"
+              label="&datamanCmd.label;"
+              command="Tools:DataMan"
+              insertafter="appmenu_addons"/>
+  </vbox>
+
 </overlay>
