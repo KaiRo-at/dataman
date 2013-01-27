@@ -344,12 +344,16 @@ function test_permissions_panel(aWin) {
                      "popup", Services.perms.DENY_ACTION);
   Services.perms.add(Services.io.newURI("http://script.getpersonas.com/", null, null),
                      "script", Services.perms.ALLOW_ACTION);
+  Services.perms.add(Services.io.newURI("http://stsuse.getpersonas.com/", null, null),
+                     "sts/use", Services.perms.ALLOW_ACTION);
+  Services.perms.add(Services.io.newURI("http://stssubd.getpersonas.com/", null, null),
+                     "sts/subd", Services.perms.ALLOW_ACTION);
   Services.perms.add(Services.io.newURI("http://stylesheet.getpersonas.com/", null, null),
                      "stylesheet", Services.perms.DENY_ACTION);
   Services.perms.add(Services.io.newURI("http://test.getpersonas.com/", null, null),
                      "test", Services.perms.DENY_ACTION);
   Services.logins.setLoginSavingEnabled("password.getpersonas.com", false);
-  is(aWin.gPerms.list.children.length, 16,
+  is(aWin.gPerms.list.children.length, 17,
      "The correct number of permissions is displayed in the list");
   for (let i = 1; i < aWin.gPerms.list.children.length; i++) {
     let perm = aWin.gPerms.list.children[i];
@@ -455,6 +459,24 @@ function test_permissions_panel(aWin) {
         break;
       case "script":
         is(perm.getAttribute("label"), "Run Scripts",
+           "Correct label for type: " + perm.type);
+        is(perm.capability, 1,
+           "Correct capability for: " + perm.host);
+        perm.useDefault(true);
+        is(perm.capability, 0,
+           "Set back to correct default");
+        break;
+      case "sts/use":
+        is(perm.getAttribute("label"), "Use Strict Transport Security",
+           "Correct label for type: " + perm.type);
+        is(perm.capability, 1,
+           "Correct capability for: " + perm.host);
+        perm.useDefault(true);
+        is(perm.capability, 0,
+           "Set back to correct default");
+        break;
+      case "sts/subd":
+        is(perm.getAttribute("label"), "Apply Strict Transport Security to subdomains",
            "Correct label for type: " + perm.type);
         is(perm.capability, 1,
            "Correct capability for: " + perm.host);

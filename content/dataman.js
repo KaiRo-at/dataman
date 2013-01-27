@@ -1307,7 +1307,8 @@ var gPerms = {
       this.addType.removeAllItems(); // Make sure list is clean.
       let permTypes = ["allowXULXBL", "cookie", "geo", "image", "indexedDB",
                        "install", "object", "offline-app", "password",
-                       "plugins", "popup", "script", "stylesheet"];
+                       "plugins", "popup", "script", "sts/use", "sts/subd",
+                       "stylesheet"];
       for (let i = 0; i < permTypes.length; i++) {
         let typeDesc = permTypes[i];
         try {
