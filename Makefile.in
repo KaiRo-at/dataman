@@ -16,7 +16,7 @@ endif
 
 MODULE       = dataman
 
-EXTENSION_VERSION      = 1.6
+EXTENSION_VERSION      = 1.7
 
 XPI_NAME               = dataman
 USE_EXTENSION_MANIFEST = 1
