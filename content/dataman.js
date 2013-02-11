@@ -2333,10 +2333,8 @@ var gStorage = {
     for (let i = 0; i < domstorelist.length; i++) {
       // Get the host from the reversed scope.
       let scopeparts = domstorelist[i].scope.split(":");
-      let host = "", origHost = "", type = "unknown";
-      for (let c = 0; c < scopeparts[0].length; c++) {
-        origHost = scopeparts[0].charAt(c) + origHost;
-      }
+      let host = "", type = "unknown";
+      let origHost = scopeparts[0].split("").reverse().join("");
       let rawHost = host = origHost.replace(/^\./, "");
       if (scopeparts.length > 1) {
         // This is a localStore, [1] is protocol, [2] is port.
@@ -2353,9 +2351,9 @@ var gStorage = {
       if (type != "unknown") {
         // Merge entries for one scope into a single entry if possible.
         let scopefound = false;
-        for (let i = 0; i < this.storages.length; i++) {
-          if (this.storages[i].type == type && this.storages[i].host == host) {
-            this.storages[i].keys.push(domstorelist[i].key);
+        for (let j = 0; j < this.storages.length; j++) {
+          if (this.storages[j].type == type && this.storages[j].host == host) {
+            this.storages[j].keys.push(domstorelist[i].key);
             scopefound = true;
             break;
           }
@@ -2372,7 +2370,7 @@ var gStorage = {
     }
 
     // Load indexedDB entries, unfortunately need to read directory for now. :(
-    // Bug 360858 would make this easier and clean.
+    // Bug 630858 would make this easier and clean.
     let dir = Components.classes["@mozilla.org/file/directory_service;1"]
                         .getService(Components.interfaces.nsIProperties)
                         .get("ProfD", Components.interfaces.nsIFile);
@@ -2396,6 +2394,8 @@ var gStorage = {
                             type: "indexedDB",
                             size: 0,
                             path: file.path});
+        // Get IndexedDB usage (DB size)
+        // See http://mxr.mozilla.org/mozilla-central/source/dom/indexedDB/nsIIndexedDatabaseManager.idl?mark=39-52#39
         gLocSvc.idxdbmgr.getUsageForURI(uri,
             function(aUri, aUsage) {
               gStorage.storages.forEach(function(aElement) {
