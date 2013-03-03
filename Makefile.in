@@ -10,10 +10,6 @@ relativesrcdir = extensions/dataman
 
 include $(DEPTH)/config/autoconf.mk
 
-ifdef ENABLE_TESTS
-PARALLEL_DIRS += tests
-endif
-
 MODULE       = dataman
 
 EXTENSION_VERSION      = 1.7
