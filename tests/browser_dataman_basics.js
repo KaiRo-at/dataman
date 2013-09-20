@@ -22,8 +22,8 @@ const kPreexistingDomains = 12;
 function test() {
   // Preload data.
   // Note that before this test starts, what is already set are permissions for
-  // getpersonas.com and addons.mozilla.org to install addons as well as
-  // permissions for a number of sites used in mochitest to load XUL/XBL.
+  // addons.mozilla.org to install addons as well as permissions for a number
+  // of sites used in mochitest to load XUL/XBL.
   // For the latter, those 12 domains are used/listed: 127.0.0.1, bank1.com,
   // bank2.com, example.com, example.org, mochi.test, mozilla.com, test,
   // w3.org, w3c-test.org, xn--exmple-cua.test, xn--hxajbheg2az3al.xn--jxalpdlp
@@ -31,6 +31,11 @@ function test() {
   // we should avoid using those domains altogether as we can't remove them.
 
   let now_epoch = parseInt(Date.now() / 1000);
+
+  // Add dummy permission for getpersonas.com, less work (compared to rewriting
+  // the test to work without getpersonas.com)
+  Services.perms.add(Services.io.newURI("http://getpersonas.com/", null, null),
+                     "install", Services.perms.ALLOW_ACTION);
 
   // Add cookie: not secure, non-HTTPOnly, session
   Services.cookies.add("bar.geckoisgecko.org", "", "name0", "value0",
@@ -427,7 +432,7 @@ function test_permissions_panel(aWin) {
         is(perm.capability, 1,
            "Correct capability for: " + perm.host);
         perm.useDefault(true);
-        is(perm.capability, 2,
+        is(perm.capability, 1,
            "Set back to correct default");
         break;
       case "password":
