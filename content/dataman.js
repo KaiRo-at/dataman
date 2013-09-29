@@ -1258,11 +1258,15 @@ var gPerms = {
       if (gDomains.hostMatchesSelected(rawHost)) {
         let permElem = document.createElement("richlistitem");
         permElem.setAttribute("type", nextPermission.type);
+        permElem.setAttribute("isInBrowserElement", nextPermission.isInBrowserElement);
+        permElem.setAttribute("appId", nextPermission.appId);
         permElem.setAttribute("host", nextPermission.host);
         permElem.setAttribute("rawHost", rawHost);
         permElem.setAttribute("displayHost",
                               gLocSvc.idn.convertToDisplayIDN(rawHost, {}));
         permElem.setAttribute("capability", nextPermission.capability);
+        permElem.setAttribute("expireType", nextPermission.expireType);
+        permElem.setAttribute("expireTime", nextPermission.expireTime);
         permElem.setAttribute("class", "permission");
         this.list.appendChild(permElem);
       }
@@ -1280,6 +1284,7 @@ var gPerms = {
                               gLocSvc.idn.convertToDisplayIDN(rawHost, {}));
         permElem.setAttribute("capability", Services.perms.DENY_ACTION);
         permElem.setAttribute("class", "permission");
+        permElem.setAttribute("expireType", Services.perms.EXPIRE_NEVER);
         this.list.appendChild(permElem);
       }
     }
@@ -1332,6 +1337,7 @@ var gPerms = {
       permElem.setAttribute("host", this.addHost.value);
       permElem.setAttribute("rawHost", this.addHost.value.replace(/^\./, ""));
       permElem.setAttribute("capability", this.getDefault(this.addType.value));
+      permElem.setAttribute("expireType", Services.perms.EXPIRE_NEVER);
       permElem.setAttribute("class", "permission");
       this.list.appendChild(permElem);
       this.list.disabled = false;
@@ -1449,6 +1455,7 @@ var gPerms = {
             permElem.setAttribute("host", aSubject.data);
             permElem.setAttribute("rawHost", domain);
             permElem.setAttribute("capability", 2);
+            permElem.setAttribute("expireType", Services.perms.EXPIRE_NEVER);
             permElem.setAttribute("class", "permission");
             permElem.setAttribute("orient", "vertical");
             this.list.appendChild(permElem);
@@ -1522,9 +1529,15 @@ var gPerms = {
           else {
             permElem = document.createElement("richlistitem");
             permElem.setAttribute("type", aSubject.type);
+            permElem.setAttribute("isInBrowserElement", aSubject.isInBrowserElement);
+            permElem.setAttribute("appId", aSubject.appId);
             permElem.setAttribute("host", aSubject.host);
             permElem.setAttribute("rawHost", rawHost);
+            permElem.setAttribute("displayHost",
+                                  gLocSvc.idn.convertToDisplayIDN(rawHost, {}));
             permElem.setAttribute("capability", aSubject.capability);
+            permElem.setAttribute("expireType", aSubject.expireType);
+            permElem.setAttribute("expireTime", aSubject.expireTime);
             permElem.setAttribute("class", "permission");
             permElem.setAttribute("orient", "vertical");
             this.list.appendChild(permElem);

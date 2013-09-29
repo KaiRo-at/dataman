@@ -19,12 +19,13 @@
       <constructor><![CDATA[
         var permLabel = this.type;
         try {
-          permLabel = gDataman.bundle.getString("perm." + this.type + ".label");
+          permLabel = gDataman.bundle.getString("perm." + this.type.replace(":", "_") + ".label");
         }
         catch (e) {
         }
         this.setAttribute("label", permLabel);
         this._updateRadio();
+        this._updateExpire();
       ]]></constructor>
 
       <property name="capability">
@@ -39,11 +40,44 @@
         ]]></setter>
       </property>
 
+      <property name="expireType">
+        <getter><![CDATA[
+          if (this.hasAttribute("expireType"))
+            return this.getAttribute("expireType");
+          return Services.perms.EXPIRE_NEVER;
+        ]]></getter>
+        <setter><![CDATA[
+          this.setAttribute("expireType", val);
+          this._updateExpire();
+        ]]></setter>
+      </property>
+
+      <property name="expireTime">
+        <getter><![CDATA[
+          if (this.hasAttribute("expireTime"))
+            return this.getAttribute("expireTime");
+          return null;
+        ]]></getter>
+        <setter><![CDATA[
+          this.setAttribute("expireTime", val);
+          this._updateExpire();
+        ]]></setter>
+      </property>
+
+      <property name="expireTime"
+                onget="return this.getAttribute('expireTime');"/>
+
       <property name="host" readonly="true"
                 onget="return this.getAttribute('host');"/>
 
       <property name="type" readonly="true"
                 onget="return this.getAttribute('type');"/>
+
+      <property name="isInBrowserElement" readonly="true"
+                onget="return this.getAttribute('isInBrowserElement');"/>
+
+      <property name="appId" readonly="true"
+                onget="return this.getAttribute('appId');"/>
 
       <method name="_updateRadio">
         <body><![CDATA[
@@ -55,6 +89,24 @@
             let radioGroup = document.getAnonymousElementByAttribute(this, "anonid",
                                                                      "radioGroup");
             radioGroup.selectedIndex = -1;
+          }
+        ]]></body>
+      </method>
+
+      <method name="_updateExpire">
+        <body><![CDATA[
+          let expLabel = document.getAnonymousElementByAttribute(this, "anonid", "permExpire");
+          if (this.expireType == Services.perms.EXPIRE_NEVER)
+            expLabel.hidden = true;
+          else {
+            expLabel.hidden = false;
+            if (this.expireType == Services.perms.EXPIRE_SESSION)
+              expLabel.value = gDataman.bundle.getString("perm.expireSession");
+            else {
+              expDate = new Date(parseInt(this.expireTime));
+              expLabel.value = gDataman.bundle.getString("perm.expirePrefix") +
+                               ": " + expDate.toLocaleString();
+            }
           }
         ]]></body>
       </method>
@@ -116,6 +168,8 @@
       <xul:hbox>
         <xul:label anonid="permHost" class="hostLabel" xbl:inherits="value=displayHost"/>
         <xul:label anonid="permLabel" class="permissionLabel" xbl:inherits="value=label" control="radioGroup"/>
+        <xul:spacer flex="1"/>
+        <xul:label anonid="permExpire" class="permissionExpire"/>
       </xul:hbox>
       <xul:hbox role="group" aria-labelledby="permLabel">
         <xul:checkbox class="indent" anonid="useDefault" label="&perm.UseDefault;"
