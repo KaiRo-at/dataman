@@ -33,7 +33,7 @@ DEFINES += -DAB_CD=en-US \
 include $(topsrcdir)/config/rules.mk
 
 ifdef MOZ_OMNIJAR
-ABS_DIST = $(call core_abspath,$(DIST)/bin)
+ABS_DIST = $(abspath $(DIST)/bin)
 
 libs::
 	@echo "Packaging $(INSTALL_EXTENSION_ID).xpi"
