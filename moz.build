@@ -5,4 +5,5 @@
 
 TEST_DIRS += ['tests']
 
-MODULE = 'dataman'
+XPI_NAME = 'dataman'
+export('XPI_NAME')
