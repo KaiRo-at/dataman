@@ -7,3 +7,5 @@ TEST_DIRS += ['tests']
 
 XPI_NAME = 'dataman'
 export('XPI_NAME')
+
+JAR_MANIFESTS += ['jar.mn']
