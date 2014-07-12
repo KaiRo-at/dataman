@@ -350,26 +350,50 @@
           <description>&pwd.description;</description>
           <tree id="passwordsTree"
                 flex="1"
-                hidecolumnpicker="true"
                 onkeypress="gPasswords.handleKeyPress(event);"
                 onselect="gPasswords.select();"
                 context="passwordsTreeContextMenu">
             <treecols onclick="gPasswords.sort(event.target, true, true);">
               <treecol id="pwdHostCol"
                        label="&pwd.tree.host.label;"
-                       flex="5"
+                       ignoreincolumnpicker="true"
+                       flex="40"
                        persist="width"/>
               <splitter class="tree-splitter"/>
               <treecol id="pwdUserCol"
                        label="&pwd.tree.username.label;"
-                       flex="2"
+                       ignoreincolumnpicker="true"
+                       flex="25"
                        persist="width"/>
               <splitter class="tree-splitter"/>
               <treecol id="pwdPasswordCol"
                        label="&pwd.tree.password.label;"
-                       flex="2"
+                       ignoreincolumnpicker="true"
+                       flex="15"
                        hidden="true"
                        persist="width"/>
+              <splitter class="tree-splitter"/>
+              <treecol id="pwdTimeCreatedCol"
+                       label="&pwd.tree.timeCreated.label;"
+                       flex="10"
+                       hidden="true"
+                       persist="width hidden"/>
+              <splitter class="tree-splitter"/>
+              <treecol id="pwdTimeLastUsedCol"
+                       label="&pwd.tree.timeLastUsed.label;"
+                       flex="20"
+                       persist="width hidden"/>
+              <splitter class="tree-splitter"/>
+              <treecol id="pwdTimePasswordChangedCol"
+                       label="&pwd.tree.timePasswordChanged.label;"
+                       flex="10"
+                       persist="width hidden"/>
+              <splitter class="tree-splitter"/>
+              <treecol id="pwdTimesUsedCol"
+                       label="&pwd.tree.timesUsed.label;"
+                       flex="1"
+                       hidden="true"
+                       persist="width hidden"/>
             </treecols>
             <treechildren/>
           </tree>

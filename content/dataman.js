@@ -1546,7 +1546,7 @@ var gPerms = {
         gDomains.addDomainOrFlag(rawHost, "hasPermissions");
       }
     }
-    this.list.disabled = !this.list.itemCount;
+    if (this.list) { this.list.disabled = !this.list.itemCount; }
   },
 
   forget: function permissions_forget() {
@@ -1900,6 +1900,8 @@ var gPasswords = {
   allSignons: [],
   displayedSignons: [],
   showPasswords: false,
+  dateFormatter: null,
+  dateAndTimeFormatter: null,
 
   initialize: function passwords_initialize() {
     gDataman.debugMsg("Initializing passwords panel");
@@ -1913,10 +1915,17 @@ var gPasswords = {
 
     this.pwdCol = document.getElementById("pwdPasswordCol");
 
+    this.dateFormatter = new Intl.DateTimeFormat(undefined,
+                           { day: "numeric", month: "short", year: "numeric" });
+    this.dateAndTimeFormatter = new Intl.DateTimeFormat(undefined,
+                                  { day: "numeric", month: "short", year: "numeric",
+                                    hour: "numeric", minute: "numeric" });
+
     this.tree.treeBoxObject.beginUpdateBatch();
     // this.loadList() is being called in gDomains.initialize() already
     this.displayedSignons = this.allSignons.filter(
       function (aSignon) {
+        aSignon.QueryInterface(Components.interfaces.nsILoginMetaInfo);
         return gDomains.hostMatchesSelected(aSignon.hostname);
       });
     this.sort(null, false, false);
@@ -1994,6 +2003,14 @@ var gPasswords = {
           return dirFactor * aOne.username.localeCompare(aTwo.username);
         case "pwdPasswordCol":
           return dirFactor * aOne.password.localeCompare(aTwo.password);
+        case "pwdTimeCreatedCol":
+          return dirFactor * (aOne.timeCreated - aTwo.timeCreated);
+        case "pwdTimeLastUsedCol":
+          return dirFactor * (aOne.timeLastUsed - aTwo.timeLastUsed);
+        case "pwdTimePasswordChangedCol":
+          return dirFactor * (aOne.timePasswordChanged - aTwo.timePasswordChanged);
+        case "pwdTimesUsedCol":
+          return dirFactor * (aOne.timesUsed - aTwo.timesUsed);
       }
       return 0;
     };
@@ -2254,6 +2271,7 @@ var gPasswords = {
     return this.displayedSignons.length;
   },
   getCellText: function(aRow, aColumn) {
+    let time;
     let signon = this.displayedSignons[aRow];
     switch (aColumn.id) {
       case "pwdHostCol":
@@ -2264,6 +2282,17 @@ var gPasswords = {
         return signon.username || "";
       case "pwdPasswordCol":
         return signon.password || "";
+      case "pwdTimeCreatedCol":
+        time = new Date(signon.timeCreated);
+        return this.dateFormatter.format(time);
+      case "pwdTimeLastUsedCol":
+        time = new Date(signon.timeLastUsed);
+        return this.dateAndTimeFormatter.format(time);
+      case "pwdTimePasswordChangedCol":
+        time = new Date(signon.timePasswordChanged);
+        return this.dateFormatter.format(time);
+      case "pwdTimesUsedCol":
+        return signon.timesUsed;
     }
   },
 };

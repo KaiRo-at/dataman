@@ -10,7 +10,7 @@ relativesrcdir = extensions/dataman
 
 include $(DEPTH)/config/autoconf.mk
 
-EXTENSION_VERSION      = 1.7
+EXTENSION_VERSION      = 1.8
 
 XPI_NAME               = dataman
 USE_EXTENSION_MANIFEST = 1

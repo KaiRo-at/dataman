@@ -95,6 +95,10 @@
 <!ENTITY pwd.tree.host.label "Website">
 <!ENTITY pwd.tree.username.label "Username">
 <!ENTITY pwd.tree.password.label "Password">
+<!ENTITY pwd.tree.timeCreated.label "First Used">
+<!ENTITY pwd.tree.timeLastUsed.label "Last Used">
+<!ENTITY pwd.tree.timePasswordChanged.label "Last Changed">
+<!ENTITY pwd.tree.timesUsed.label "Times Used">
 
 <!ENTITY pwd.ctx.remove.label "Remove">
 <!ENTITY pwd.ctx.remove.accesskey "R">
