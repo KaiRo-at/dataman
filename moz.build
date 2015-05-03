@@ -5,7 +5,14 @@
 
 TEST_DIRS += ['tests']
 
+NO_JS_MANIFEST = True
+USE_EXTENSION_MANIFEST = True
+
 XPI_NAME = 'dataman'
 export('XPI_NAME')
 
 JAR_MANIFESTS += ['jar.mn']
+
+EXTRA_COMPONENTS += [
+    'aboutData.js',
+]
